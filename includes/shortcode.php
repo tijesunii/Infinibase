@@ -1,93 +1,93 @@
 <?php
 /**
- * Infinite FAQs - Shortcode Renderer
+ * InfiniBase - Shortcode Renderer
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-function infinite_faqs_register_shortcodes() {
-	add_shortcode( 'infinite_faqs', 'infinite_faqs_render_shortcode' );
-	add_shortcode( 'infinite_faqs_light', 'infinite_faqs_render_light_shortcode' );
-	add_shortcode( 'infinite_faqs_dark', 'infinite_faqs_render_dark_shortcode' );
+function infinibase_register_shortcodes() {
+	add_shortcode( 'infinibase', 'infinibase_render_shortcode' );
+	add_shortcode( 'infinibase_light', 'infinibase_render_light_shortcode' );
+	add_shortcode( 'infinibase_dark', 'infinibase_render_dark_shortcode' );
 }
-add_action( 'init', 'infinite_faqs_register_shortcodes' );
+add_action( 'init', 'infinibase_register_shortcodes' );
 
-function infinite_faqs_register_frontend_assets() {
+function infinibase_register_frontend_assets() {
 	wp_register_style(
-		'infinite-faqs-style',
-		INFINITE_FAQS_PLUGIN_URL . 'assets/css/infinite-faqs.css',
+		'infinibase-style',
+		INFINIBASE_PLUGIN_URL . 'assets/css/infinibase.css',
 		array(),
-		INFINITE_FAQS_VERSION
+		INFINIBASE_VERSION
 	);
 
 	wp_register_script(
-		'infinite-faqs-script',
-		INFINITE_FAQS_PLUGIN_URL . 'assets/js/infinite-faqs.js',
+		'infinibase-script',
+		INFINIBASE_PLUGIN_URL . 'assets/js/infinibase.js',
 		array(),
-		INFINITE_FAQS_VERSION,
+		INFINIBASE_VERSION,
 		true
 	);
 }
-add_action( 'wp_enqueue_scripts', 'infinite_faqs_register_frontend_assets' );
-add_action( 'elementor/frontend/after_enqueue_styles', 'infinite_faqs_enqueue_frontend_assets' );
-add_action( 'elementor/preview/enqueue_styles', 'infinite_faqs_enqueue_frontend_assets' );
+add_action( 'wp_enqueue_scripts', 'infinibase_register_frontend_assets' );
+add_action( 'elementor/frontend/after_enqueue_styles', 'infinibase_enqueue_frontend_assets' );
+add_action( 'elementor/preview/enqueue_styles', 'infinibase_enqueue_frontend_assets' );
 
-function infinite_faqs_get_frontend_config() {
+function infinibase_get_frontend_config() {
 	return array(
-		'restUrl'     => esc_url_raw( rest_url( 'infinite-faqs/v1/ask' ) ),
-		'token'       => infinite_faqs_create_security_token(),
+		'restUrl'     => esc_url_raw( rest_url( 'infinibase/v1/ask' ) ),
+		'nonce'       => wp_create_nonce( 'infinibase_ask' ),
 		'wpRestNonce' => wp_create_nonce( 'wp_rest' ),
-		'supportUrl'  => esc_url_raw( get_option( 'infinite_faqs_support_url', '' ) ),
+		'supportUrl'  => esc_url_raw( get_option( 'infinibase_support_url', '' ) ),
 		'i18n'        => array(
-			'emptyError'   => __( 'Please enter a question (at least 5 characters).', 'infinite-faqs' ),
-			'genericError' => __( 'We are unable to process your question at this time.', 'infinite-faqs' ),
-			'readMore'     => __( 'Read more →', 'infinite-faqs' ),
-			'contactBtn'   => __( 'Contact Support →', 'infinite-faqs' ),
+			'emptyError'   => __( 'Please enter a question (at least 5 characters).', 'infinibase' ),
+			'genericError' => __( 'We are unable to process your question at this time.', 'infinibase' ),
+			'readMore'     => __( 'Read more →', 'infinibase' ),
+			'contactBtn'   => __( 'Contact Support →', 'infinibase' ),
 		),
 	);
 }
 
-function infinite_faqs_enqueue_frontend_assets() {
-	if ( ! wp_style_is( 'infinite-faqs-style', 'registered' ) ) {
-		infinite_faqs_register_frontend_assets();
+function infinibase_enqueue_frontend_assets() {
+	if ( ! wp_style_is( 'infinibase-style', 'registered' ) ) {
+		infinibase_register_frontend_assets();
 	}
 
-	wp_enqueue_style( 'infinite-faqs-style' );
+	wp_enqueue_style( 'infinibase-style' );
 
-	if ( ! wp_script_is( 'infinite-faqs-script', 'enqueued' ) ) {
-		wp_enqueue_script( 'infinite-faqs-script' );
+	if ( ! wp_script_is( 'infinibase-script', 'enqueued' ) ) {
+		wp_enqueue_script( 'infinibase-script' );
 
 		wp_localize_script(
-			'infinite-faqs-script',
-			'infiniteFaqsData',
-			infinite_faqs_get_frontend_config()
+			'infinibase-script',
+			'infinibaseData',
+			infinibase_get_frontend_config()
 		);
 	}
 }
 
-function infinite_faqs_render_light_shortcode( $atts = array() ) {
+function infinibase_render_light_shortcode( $atts = array() ) {
 	$atts          = is_array( $atts ) ? $atts : array();
 	$atts['theme'] = 'light';
-	return infinite_faqs_render_shortcode( $atts );
+	return infinibase_render_shortcode( $atts );
 }
 
-function infinite_faqs_render_dark_shortcode( $atts = array() ) {
+function infinibase_render_dark_shortcode( $atts = array() ) {
 	$atts          = is_array( $atts ) ? $atts : array();
 	$atts['theme'] = 'dark';
-	return infinite_faqs_render_shortcode( $atts );
+	return infinibase_render_shortcode( $atts );
 }
 
-function infinite_faqs_render_shortcode( $atts = array() ) {
-	infinite_faqs_enqueue_frontend_assets();
+function infinibase_render_shortcode( $atts = array() ) {
+	infinibase_enqueue_frontend_assets();
 
-	$saved_heading = get_option( 'infinite_faqs_shortcode_heading', 'Questions' );
+	$saved_heading = get_option( 'infinibase_shortcode_heading', 'Questions' );
 	if ( empty( $saved_heading ) ) {
 		$saved_heading = 'Questions';
 	}
 
-	$saved_subtitle = get_option( 'infinite_faqs_shortcode_subtitle', 'The short ones are here. For anything else, ask our AI below.' );
+	$saved_subtitle = get_option( 'infinibase_shortcode_subtitle', 'The short ones are here. For anything else, ask our AI below.' );
 	if ( '' === trim( $saved_subtitle ) ) {
 		$saved_subtitle = 'The short ones are here. For anything else, ask our AI below.';
 	}
@@ -99,7 +99,7 @@ function infinite_faqs_render_shortcode( $atts = array() ) {
 			'subtitle' => $saved_subtitle,
 		),
 		$atts,
-		'infinite_faqs'
+		'infinibase'
 	);
 
 	$heading_text = mb_substr( trim( $atts['title'] ), 0, 9 );
@@ -109,9 +109,9 @@ function infinite_faqs_render_shortcode( $atts = array() ) {
 
 	$theme_mode  = ( 'dark' === strtolower( $atts['theme'] ) ) ? 'dark' : 'light';
 	$theme_class = 'infinite-faqs-theme-' . $theme_mode;
-	$config_json = wp_json_encode( infinite_faqs_get_frontend_config() );
+	$config_json = wp_json_encode( infinibase_get_frontend_config() );
 
-	$static_faqs = get_option( 'infinite_faqs_static_faqs', array() );
+	$static_faqs = get_option( 'infinibase_static_faqs', array() );
 	if ( ! is_array( $static_faqs ) ) {
 		$static_faqs = array();
 	}
@@ -166,12 +166,12 @@ function infinite_faqs_render_shortcode( $atts = array() ) {
 								type="text"
 								name="question"
 								class="infinite-faqs-input"
-								placeholder="<?php echo esc_attr__( 'Ask a question about our product...', 'infinite-faqs' ); ?>"
-								aria-label="<?php echo esc_attr__( 'Ask a question about our product', 'infinite-faqs' ); ?>"
+								placeholder="<?php echo esc_attr__( 'Ask a question about our product...', 'infinibase' ); ?>"
+								aria-label="<?php echo esc_attr__( 'Ask a question about our product', 'infinibase' ); ?>"
 								maxlength="250"
 								required
 							/>
-							<button type="submit" class="infinite-faqs-submit-btn" aria-label="<?php echo esc_attr__( 'Submit question', 'infinite-faqs' ); ?>">
+							<button type="submit" class="infinite-faqs-submit-btn" aria-label="<?php echo esc_attr__( 'Submit question', 'infinibase' ); ?>">
 								<span class="infinite-faqs-icon-container">
 									<svg class="infinite-faqs-icon" viewBox="0 0 24 24">
 										<path d="M5 12h14M12 5l7 7-7 7" />
@@ -183,7 +183,7 @@ function infinite_faqs_render_shortcode( $atts = array() ) {
 
 					<div class="infinite-faqs-loading" aria-live="polite">
 						<span class="infinite-faqs-spinner"></span>
-						<span class="infinite-faqs-loading-text"><?php esc_html_e( 'Searching docs...', 'infinite-faqs' ); ?></span>
+						<span class="infinite-faqs-loading-text"><?php esc_html_e( 'Searching docs...', 'infinibase' ); ?></span>
 					</div>
 
 					<div class="infinite-faqs-response-container" aria-live="polite">

@@ -1,6 +1,6 @@
-=== Infinite FAQs ===
+=== InfiniBase: AI FAQ & Knowledge Base ===
 Contributors: nezeer
-Tags: faq, ai, knowledge-base, accordion, markdown
+Tags: faq, ai, knowledge-base, accordion, customer-support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
@@ -8,75 +8,78 @@ Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-AI-powered FAQ knowledge base using your own API key (BYOK) to generate accurate answers from your Markdown docs without hallucinations.
+Turn your product documentation into an interactive FAQ section with built-in AI search that answers visitor questions accurately.
 
 == Description ==
 
-**Infinite FAQs** combines a clean, responsive 4-card FAQ accordion with an interactive AI search bar backed directly by your own Markdown (`.md`) documentation.
+**Static FAQs only answer 4 or 5 questions. What about everything else your visitors want to know?**
 
-Instead of relying on third-party SaaS subscriptions or vector databases, Infinite FAQs chunks and indexes your `.md` documentation directly inside your WordPress database (`wp_infinite_faqs_docs`) using MySQL `FULLTEXT` search and your own AI provider API key (OpenAI, Anthropic Claude, Google Gemini, or DeepSeek).
+**InfiniBase** combines a clean, modern FAQ accordion with an interactive AI search bar right below it. Visitors can browse your top questions at a glance—or type any specific question in their own words and get an instant, accurate answer pulled directly from your product documentation.
 
-= Key Features =
+No monthly SaaS subscriptions. No complex chatbot widgets floating over your page. Just a fast, native FAQ section that blends right into your website.
 
-* **Bring Your Own Key (BYOK):** Supports OpenAI (`gpt-5-mini`), Anthropic (`claude-haiku-4-5`), Google Gemini (`gemini-2.5-flash`), and DeepSeek (`deepseek-flash`) with AES-256-CBC key encryption at rest.
-* **Zero-Hallucination Grounding:** Answers are strictly generated from your uploaded Markdown documentation chunks with automatic deep-link citations (`#anchor`).
-* **Smart Fallback to Support:** If an answer is not found in your documentation, users are gracefully directed to your support URL without wasting tokens.
-* **Predefined 4-Card Accordion + AI Auto-Generator:** Manually write your top 4 FAQs or generate them in one click from any indexed `.md` document using AI.
-* **Light & Dark Mode Shortcodes:** Drop `[infinite_faqs_light]` or `[infinite_faqs_dark]` into Gutenberg or Elementor with zero jQuery dependency.
+= How It Works =
 
-== External Services ==
+1. **Connect Your Preferred AI:** Use WordPress's built-in **Settings → Connectors** or paste your own API key from OpenAI, Anthropic Claude, Google Gemini, or DeepSeek.
+2. **Upload Your Docs:** Upload your Markdown (`.md`) documentation files and link each file to the live page URL where that guide lives on your site.
+3. **Set Your Top 4 FAQs:** Write your 4 main FAQ cards manually—or let AI generate them from your uploaded docs in one click.
+4. **Embed Anywhere:** Drop `[infinibase_light]` or `[infinibase_dark]` into any page, post, Gutenberg block, or Elementor section.
 
-This plugin connects to external third-party AI APIs **only** when a site administrator explicitly configures an API key in **Infinite FAQs → Settings** and selects one of the supported providers below. No data is transmitted to any external server until an API key is configured.
+= Why Site Owners Choose InfiniBase =
 
-When configured, data is sent to the selected AI provider under three specific circumstances:
-1. **Markdown Ingestion (Admin):** When an administrator uploads a `.md` file in **Infinite FAQs → Knowledge Base**, the text chunks of that document are sent to the configured AI provider to generate search keywords.
-2. **Predefined FAQ Auto-Generation (Admin):** When an administrator clicks **Generate 4 FAQs with AI**, the selected indexed document chunks are sent to the configured AI provider to generate 4 question-and-answer pairs.
-3. **Visitor Question Answering (Frontend):** When a visitor submits a question in the FAQ search bar and a matching documentation chunk is found in the local WordPress database, the visitor's sanitized question and the matched documentation chunk are sent to the configured AI provider to generate a grounded response.
+* **Answers Grounded in Your Docs (No Made-Up Replies):** InfiniBase only answers using the documentation you upload. It never guesses or invents features you don't have.
+* **Automatic "Read More" Links:** Every AI answer includes a direct link to the exact section of your documentation page so visitors can read further.
+* **Smart Support Fallback:** If a visitor asks something that isn't covered in your docs, InfiniBase politely lets them know and gives them a direct button to your Contact Support page.
+* **1-Click FAQ Generator:** Don't want to write your initial FAQ cards from scratch? Select any uploaded document and generate 4 ready-to-use FAQs in seconds.
+* **Light & Dark Themes Built In:** Includes ready-to-use Light (`[infinibase_light]`) and Dark (`[infinibase_dark]`) modes designed to look great on any WordPress theme or page builder.
+* **No Subscriptions — Bring Your Own Key:** Pay only pennies per thousand questions directly to your chosen AI provider instead of $49+/month for a third-party chatbot tool.
 
-= Supported Third-Party AI Providers =
+= External Services & Privacy Disclosure =
 
-* **OpenAI API** (`https://api.openai.com/v1/chat/completions`)
-  * Service Website: https://openai.com/api/
-  * Terms of Use: https://openai.com/policies/terms-of-use/
-  * Privacy Policy: https://openai.com/policies/privacy-policy/
-* **Anthropic Claude API** (`https://api.anthropic.com/v1/messages`)
-  * Service Website: https://www.anthropic.com/api
-  * Terms of Service: https://www.anthropic.com/legal/commercial-terms
-  * Privacy Policy: https://www.anthropic.com/legal/privacy
-* **Google Gemini API** (`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`)
-  * Service Website: https://ai.google.dev/
-  * Terms of Service: https://ai.google.dev/gemini-api/terms
-  * Privacy Policy: https://policies.google.com/privacy
-* **DeepSeek API** (`https://api.deepseek.com/chat/completions`)
-  * Service Website: https://platform.deepseek.com/
-  * Terms of Service: https://cdn.deepseek.com/policies/en-US/deepseek-open-platform-terms-of-service.html
-  * Privacy Policy: https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html
+InfiniBase connects to an external AI provider **only** after a site administrator configures one in **InfiniBase → Settings**. When configured, text is sent to your chosen provider only when:
+1. An admin uploads a `.md` file in the dashboard (to index search topics).
+2. An admin clicks **Generate 4 FAQs with AI** in the dashboard.
+3. A visitor submits a question in the FAQ search bar that matches your uploaded documentation.
 
-== Third-Party Libraries & Source Code ==
+Depending on which provider you select, requests are sent to one of the following services:
+* **WordPress Core AI Connectors:** [Documentation](https://wordpress.org/documentation/article/settings-connectors-screen/)
+* **OpenAI** (`api.openai.com`): [Website](https://openai.com/api/) | [Terms](https://openai.com/policies/terms-of-use/) | [Privacy Policy](https://openai.com/policies/privacy-policy/)
+* **Anthropic Claude** (`api.anthropic.com`): [Website](https://www.anthropic.com/api) | [Terms](https://www.anthropic.com/legal/commercial-terms) | [Privacy Policy](https://www.anthropic.com/legal/privacy)
+* **Google Gemini** (`generativelanguage.googleapis.com`): [Website](https://ai.google.dev/) | [Terms](https://ai.google.dev/gemini-api/terms) | [Privacy Policy](https://policies.google.com/privacy)
+* **DeepSeek** (`api.deepseek.com`): [Website](https://platform.deepseek.com/) | [Terms](https://cdn.deepseek.com/policies/en-US/deepseek-open-platform-terms-of-service.html) | [Privacy Policy](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html)
 
-* **Parsedown** (`v1.8.0` by Emanuil Rusev, bundled in `lib/Parsedown.php` and prefixed as `Infinite_FAQs_Parsedown`): Licensed under the MIT License (GPL-compatible). Source repository: https://github.com/erusev/parsedown
-* **Plugin Source Code:** All JavaScript (`assets/js/infinite-faqs.js`) and CSS (`assets/css/infinite-faqs.css`) are shipped in unminified, human-readable form. Public development repository: https://github.com/tijesunii/Infinite-FAQs
+Open-source development repository: https://github.com/tijesunii/Infinite-FAQs
 
 == Installation ==
 
-1. Upload the `infinite-faqs` folder to the `/wp-content/plugins/` directory, or install the plugin through the WordPress plugins screen directly.
-2. Activate the plugin through the 'Plugins' screen in WordPress.
-3. Navigate to **Infinite FAQs → Settings** to select your AI Provider, enter your API Key, and configure your Support Page URL.
-4. Navigate to **Infinite FAQs → Knowledge Base** to upload your `.md` documentation files, customize your shortcode heading/subtitle, or auto-generate your 4 predefined FAQ cards.
-5. Copy `[infinite_faqs_light]` or `[infinite_faqs_dark]` and paste it into any page or post.
+1. Install and activate **InfiniBase** from your WordPress dashboard.
+2. Go to **InfiniBase → Settings** to connect your AI provider and add your Contact Support URL.
+3. Go to **InfiniBase → Knowledge Base** to upload your `.md` documentation files and set up your 4 FAQ cards.
+4. Copy `[infinibase_light]` or `[infinibase_dark]` and paste it into any page or post.
 
 == Frequently Asked Questions ==
 
-= Which AI providers are supported? =
-Infinite FAQs supports OpenAI (`gpt-5-mini`), Anthropic (`claude-haiku-4-5`), Google Gemini (`gemini-2.5-flash`), and DeepSeek (`deepseek-flash`).
+= Which AI providers can I use? =
+You can connect OpenAI, Anthropic Claude, Google Gemini, or DeepSeek using your own API key, or use WordPress's built-in **Settings → Connectors** screen.
 
-= Does this plugin require jQuery? =
-No. The frontend widget is built with 100% Vanilla JavaScript and scoped CSS variables for fast page loads and full compatibility with Gutenberg and Elementor.
+= Will the AI make up answers about my product? =
+No. InfiniBase strictly restricts answers to the documentation you have uploaded. If a visitor asks a question that isn't covered in your docs, it will not guess—instead, it shows a friendly fallback message with a button to your Contact Support page.
 
-= What happens if a visitor asks a question not covered by my Markdown files? =
-The plugin checks your MySQL `FULLTEXT` index first and enforces a strict zero-hallucination system prompt. When a topic is not in your docs, it displays a fallback message with a direct link to your configured Support Page URL.
+= Can I use this with Elementor, Gutenberg, or other page builders? =
+Yes! InfiniBase works anywhere shortcodes are supported, including the WordPress Block Editor (Gutenberg), Elementor, Bricks, Divi, and classic themes.
+
+= What happens if I don't want to write the 4 FAQ cards myself? =
+Inside **InfiniBase → Knowledge Base**, you can select any uploaded document and click **Generate 4 FAQs with AI** to automatically create 4 common questions and answers, which you can edit anytime.
+
+== Screenshots ==
+
+1. Light Mode (`[infinibase_light]`) — Clean two-column FAQ accordion with instant AI search and deep-link documentation citations.
+2. Dark Mode (`[infinibase_dark]`) — Built-in dark theme ready for modern WordPress themes, Gutenberg, and Elementor.
+3. InfiniBase Settings — Connect via WordPress Core AI Connectors or Bring Your Own Key (OpenAI, Anthropic, Google Gemini, DeepSeek).
+4. Knowledge Base Management — One-click shortcode copy, Markdown (`.md`) documentation uploader, and indexed file manager.
+5. Shortcode Display & 1-Click AI FAQ Generator — Customize your section heading/subtitle and auto-generate 4 predefined FAQ cards from your docs.
 
 == Changelog ==
 
 = 1.0.0 =
-* Initial release of Infinite FAQs.
+* Initial release of InfiniBase: AI FAQ & Knowledge Base.

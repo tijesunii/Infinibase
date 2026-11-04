@@ -1,4 +1,5 @@
 <?php
+namespace InfiniBase\Vendor;
 
 #
 #
@@ -17,7 +18,9 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class Infinite_FAQs_Parsedown
+if ( ! class_exists( __NAMESPACE__ . '\Parsedown' ) ) :
+
+class Parsedown
 {
     # ~
 
@@ -1997,3 +2000,6 @@ class Infinite_FAQs_Parsedown
                    'wbr', 'time',
     );
 }
+
+endif;
+

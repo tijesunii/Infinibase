@@ -1,13 +1,13 @@
 /**
- * Infinite FAQs - Frontend Controller
+ * InfiniBase - Frontend Controller
  */
 
 (function () {
 	'use strict';
 
 	function getConfig(wrapper) {
-		if (typeof window.infiniteFaqsData !== 'undefined' && window.infiniteFaqsData.restUrl) {
-			return window.infiniteFaqsData;
+		if (typeof window.infinibaseData !== 'undefined' && window.infinibaseData.restUrl) {
+			return window.infinibaseData;
 		}
 		if (wrapper && wrapper.dataset && wrapper.dataset.config) {
 			try {
@@ -115,7 +115,7 @@
 				headers: headers,
 				body: JSON.stringify({
 					question: question,
-					_ifaq_token: config.token,
+					nonce: config.nonce,
 					_ifaq_email_check: honeypotVal
 				}),
 				credentials: 'same-origin'

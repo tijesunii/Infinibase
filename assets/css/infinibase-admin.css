@@ -1,5 +1,5 @@
 /**
- * Infinite FAQs - Admin Styles
+ * InfiniBase - Admin Styles
  */
 
 .ifaq-admin-shortcodes-card.card {
@@ -198,4 +198,27 @@
 
 .submit.ifaq-submit-row {
 	margin-top: 20px;
+}
+
+.ifaq-wp-core-notice {
+	display: none;
+	max-width: 680px;
+	margin-top: 12px;
+	padding: 12px 14px;
+	background: #f0f6fc;
+	border-left: 4px solid #2271b1;
+	border-radius: 2px;
+}
+
+.ifaq-wp-core-notice.is-visible {
+	display: block;
+}
+
+.ifaq-wp-core-notice p {
+	margin: 0;
+	line-height: 1.5;
+}
+
+.ifaq-row-hidden {
+	display: none;
 }
