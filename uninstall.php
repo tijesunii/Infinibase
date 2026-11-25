@@ -16,6 +16,8 @@ if ( ! $infinibase_keep_data || '0' === $infinibase_keep_data ) {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange
 	$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $infinibase_table_name ) );
 
+	wp_clear_scheduled_hook( 'infinibase_enrich_keywords_batch' );
+
 	delete_option( 'infinibase_api_key' );
 	delete_option( 'infinibase_support_url' );
 	delete_option( 'infinibase_ai_provider' );
@@ -24,5 +26,9 @@ if ( ! $infinibase_keep_data || '0' === $infinibase_keep_data ) {
 	delete_option( 'infinibase_shortcode_subtitle' );
 	delete_option( 'infinibase_static_faqs' );
 	delete_option( 'infinibase_db_version' );
+	delete_option( 'infinibase_pending_kw_ids' );
+	delete_option( 'infinibase_installed_at' );
+	delete_option( 'infinibase_review_status' );
+	delete_option( 'infinibase_review_snooze_until' );
 	delete_option( 'infinibase_keep_data_on_uninstall' );
 }

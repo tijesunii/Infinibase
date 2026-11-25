@@ -38,8 +38,67 @@ function infinibase_admin_enqueue_scripts( $hook_suffix ) {
 		INFINIBASE_VERSION,
 		true
 	);
+
+	wp_localize_script(
+		'infinibase-admin-script',
+		'infinibaseAdminData',
+		array(
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'infinibase_status_check' ),
+		)
+	);
 }
 add_action( 'admin_enqueue_scripts', 'infinibase_admin_enqueue_scripts' );
+
+function infinibase_get_processing_file_names() {
+	$pending_ids = get_option( 'infinibase_pending_kw_ids', array() );
+	if ( ! is_array( $pending_ids ) || empty( $pending_ids ) ) {
+		return array();
+	}
+
+	global $wpdb;
+	$table_name = $wpdb->prefix . 'infinibase_docs';
+	$processing = array();
+
+	foreach ( $pending_ids as $row_id ) {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$fname = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT file_name FROM %i WHERE id = %d',
+				$table_name,
+				absint( $row_id )
+			)
+		);
+		if ( ! empty( $fname ) ) {
+			$processing[ $fname ] = true;
+		}
+	}
+
+	return array_keys( $processing );
+}
+
+function infinibase_ajax_check_status() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+	}
+
+	check_ajax_referer( 'infinibase_status_check', 'nonce' );
+
+	$pending_ids = get_option( 'infinibase_pending_kw_ids', array() );
+	if ( is_array( $pending_ids ) && ! empty( $pending_ids ) && function_exists( 'infinibase_process_background_keyword_batch' ) ) {
+		infinibase_process_background_keyword_batch();
+	}
+
+	$still_processing = infinibase_get_processing_file_names();
+
+	wp_send_json_success(
+		array(
+			'processingFiles' => $still_processing,
+			'allReady'        => empty( $still_processing ),
+		)
+	);
+}
+add_action( 'wp_ajax_infinibase_check_status', 'infinibase_ajax_check_status' );
 
 function infinibase_make_anchor_id( $heading ) {
 	$text = trim( (string) $heading );
@@ -266,44 +325,73 @@ function infinibase_handle_upload() {
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 	$wpdb->delete( $table_name, array( 'file_name' => $file_name ), array( '%s' ) );
 
-	$upload_batch_id = uniqid( 'batch_', true );
-	$inserted_count  = 0;
+	$upload_batch_id     = uniqid( 'batch_', true );
+	$inserted_count      = 0;
+	$pending_bg_ids      = array();
+	$upload_start        = microtime( true );
+	$time_budget_seconds = 18;
+	$chunk_batches       = array_chunk( $chunks, 20 );
 
-	foreach ( $chunks as $chunk ) {
-		$keywords = infinibase_generate_keywords( $chunk['text'] );
-		if ( empty( $keywords ) ) {
-			$keywords = wp_strip_all_tags( $chunk['text'] );
+	foreach ( $chunk_batches as $batch ) {
+		$ai_keywords_map = array();
+		$within_budget   = ( microtime( true ) - $upload_start ) < $time_budget_seconds;
+
+		if ( $within_budget ) {
+			$indexed_texts = array();
+			foreach ( $batch as $local_idx => $chunk ) {
+				$indexed_texts[ $local_idx ] = $chunk['text'];
+			}
+			$ai_keywords_map = infinibase_generate_keywords_batch( $indexed_texts );
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$inserted = $wpdb->insert(
-			$table_name,
-			array(
-				'upload_batch_id' => $upload_batch_id,
-				'file_name'       => $file_name,
-				'page_slug'       => $base_page_url,
-				'anchor_id'       => $chunk['anchor'],
-				'chunk_text'      => $chunk['text'],
-				'keywords'        => $keywords,
-				'created_at'      => current_time( 'mysql' ),
-			),
-			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
-		);
-		if ( $inserted ) {
-			$inserted_count++;
+		foreach ( $batch as $local_idx => $chunk ) {
+			$has_ai_keywords = isset( $ai_keywords_map[ $local_idx ] ) && '' !== trim( $ai_keywords_map[ $local_idx ] );
+			$keywords        = $has_ai_keywords ? $ai_keywords_map[ $local_idx ] : infinibase_extract_fallback_keywords( $chunk['text'] );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$inserted = $wpdb->insert(
+				$table_name,
+				array(
+					'upload_batch_id' => $upload_batch_id,
+					'file_name'       => $file_name,
+					'page_slug'       => $base_page_url,
+					'anchor_id'       => $chunk['anchor'],
+					'chunk_text'      => $chunk['text'],
+					'keywords'        => $keywords,
+					'created_at'      => current_time( 'mysql' ),
+				),
+				array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+			);
+			if ( $inserted ) {
+				$inserted_count++;
+				if ( ! $has_ai_keywords && ! empty( $wpdb->insert_id ) ) {
+					$pending_bg_ids[] = (int) $wpdb->insert_id;
+				}
+			}
 		}
+	}
+
+	if ( ! empty( $pending_bg_ids ) ) {
+		infinibase_enqueue_background_keywords( $pending_bg_ids );
 	}
 
 	if ( file_exists( $uploaded_tmp_name ) ) {
 		wp_delete_file( $uploaded_tmp_name );
 	}
 
-	echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-		/* translators: 1: Uploaded Markdown file name, 2: Number of chunks created. */
-		esc_html__( 'Successfully processed "%1$s" into %2$d chunks and generated keywords.', 'infinibase' ),
-		esc_html( $file_name ),
-		absint( $inserted_count )
-	) . '</p></div>';
+	if ( ! empty( $pending_bg_ids ) ) {
+		echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
+			/* translators: %s: Uploaded Markdown file name. */
+			esc_html__( 'Uploaded "%s" — your docs are live now and finishing optimization in the background.', 'infinibase' ),
+			esc_html( $file_name )
+		) . '</p></div>';
+	} else {
+		echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
+			/* translators: %s: Uploaded Markdown file name. */
+			esc_html__( 'Uploaded "%s" — your knowledge base is ready!', 'infinibase' ),
+			esc_html( $file_name )
+		) . '</p></div>';
+	}
 }
 
 function infinibase_generate_faqs_from_doc( $selected_file ) {
@@ -540,10 +628,12 @@ function infinibase_ingestion_page_html() {
 		$selected_source_doc = sanitize_text_field( wp_unslash( $_POST['infinibase_source_doc'] ) );
 	}
 
-	$ai_connected = infinibase_is_ai_connected();
+	$ai_connected     = infinibase_is_ai_connected();
+	$processing_files = infinibase_get_processing_file_names();
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'Manage Knowledge Base', 'infinibase' ); ?></h1>
+		<?php infinibase_render_review_banner(); ?>
 
 		<div class="card ifaq-admin-shortcodes-card">
 			<div class="ifaq-admin-shortcodes-row">
@@ -569,13 +659,13 @@ function infinibase_ingestion_page_html() {
 
 		<div class="ifaq-admin-grid-top">
 			<div class="card ifaq-admin-card">
-				<h2><?php esc_html_e( 'Upload Markdown Documentation', 'infinibase' ); ?></h2>
-				<p><?php esc_html_e( 'Upload your .md files and the system will automatically generate search keywords using your selected AI Provider.', 'infinibase' ); ?></p>
+				<h2><?php esc_html_e( 'Upload Documentation', 'infinibase' ); ?></h2>
+				<p><?php esc_html_e( 'Upload your .md documentation files and InfiniBase will automatically prepare them for instant AI answers.', 'infinibase' ); ?></p>
 
 				<?php if ( ! $ai_connected ) : ?>
 					<div class="notice notice-warning inline">
 						<p>
-							<?php esc_html_e( 'AI Provider not connected. You must configure your AI Provider in Settings before uploading documentation so keywords can be generated for each chunk.', 'infinibase' ); ?>
+							<?php esc_html_e( 'AI Provider not connected. Please connect your AI Provider in Settings before uploading documentation.', 'infinibase' ); ?>
 							<a href="<?php echo esc_url( admin_url( 'admin.php?page=infinibase' ) ); ?>">
 								<?php esc_html_e( 'Go to InfiniBase Settings →', 'infinibase' ); ?>
 							</a>
@@ -591,7 +681,7 @@ function infinibase_ingestion_page_html() {
 							<th scope="row"><label for="infinibase_base_page_url"><?php esc_html_e( 'Base Page URL', 'infinibase' ); ?></label></th>
 							<td>
 								<input type="url" name="infinibase_base_page_url" id="infinibase_base_page_url" class="large-text" placeholder="https://example.com/pricing" value="<?php echo esc_attr( $retained_url ); ?>" <?php disabled( ! $ai_connected ); ?> required />
-								<p class="description"><?php esc_html_e( 'The live URL where this document will live. Essential for generating "Read more" links.', 'infinibase' ); ?></p>
+								<p class="description"><?php esc_html_e( 'The live URL where this document lives. Used to generate "Read more" links.', 'infinibase' ); ?></p>
 							</td>
 						</tr>
 						<tr>
@@ -615,48 +705,57 @@ function infinibase_ingestion_page_html() {
 			</div>
 
 			<div class="card ifaq-admin-card">
-				<h2><?php esc_html_e( 'Indexed Files', 'infinibase' ); ?></h2>
-				<p><?php esc_html_e( 'Documents currently chunked and indexed in your WordPress database.', 'infinibase' ); ?></p>
-				<table class="wp-list-table widefat fixed striped ifaq-indexed-table">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'File Name', 'infinibase' ); ?></th>
-							<th><?php esc_html_e( 'Base URL', 'infinibase' ); ?></th>
-							<th class="ifaq-col-chunks"><?php esc_html_e( 'Chunks', 'infinibase' ); ?></th>
-							<th><?php esc_html_e( 'Last Updated', 'infinibase' ); ?></th>
-							<th class="ifaq-col-action"><?php esc_html_e( 'Action', 'infinibase' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
+				<h2><?php esc_html_e( 'Uploaded Documents', 'infinibase' ); ?></h2>
+				<p><?php esc_html_e( 'Documents currently live in your knowledge base.', 'infinibase' ); ?></p>
+				<?php if ( ! empty( $files ) ) : ?>
+					<div class="ifaq-doc-list">
 						<?php
-						if ( ! empty( $files ) ) {
-							foreach ( $files as $file ) {
-								/* translators: %s: Markdown file name to delete. */
-								$delete_confirm_msg = sprintf( __( 'Delete "%s" from your indexed knowledge base?', 'infinibase' ), $file->file_name );
-								?>
-								<tr>
-									<td><?php echo esc_html( $file->file_name ); ?></td>
-									<td><a href="<?php echo esc_url( $file->page_slug ); ?>" target="_blank"><?php echo esc_html( $file->page_slug ); ?></a></td>
-									<td><?php echo esc_html( $file->chunks ); ?></td>
-									<td><?php echo esc_html( $file->last_updated ); ?></td>
-									<td class="ifaq-col-action">
-										<form method="post" action="" class="ifaq-inline-form">
-											<?php wp_nonce_field( 'infinibase_delete_indexed_file', 'infinibase_delete_file_nonce' ); ?>
-											<input type="hidden" name="infinibase_delete_file_name" value="<?php echo esc_attr( $file->file_name ); ?>" />
-											<button type="submit" name="infinibase_delete_file_submit" value="1" class="button button-small button-link-delete ifaq-delete-btn" data-confirm="<?php echo esc_attr( $delete_confirm_msg ); ?>">
-												<?php esc_html_e( 'Delete', 'infinibase' ); ?>
-											</button>
-										</form>
-									</td>
-								</tr>
-								<?php
-							}
-						} else {
-							echo '<tr><td colspan="5">' . esc_html__( 'No files indexed yet.', 'infinibase' ) . '</td></tr>';
-						}
-						?>
-					</tbody>
-				</table>
+						foreach ( $files as $file ) :
+							/* translators: %s: Markdown file name to delete. */
+							$delete_confirm_msg = sprintf( __( 'Delete "%s" from your knowledge base?', 'infinibase' ), $file->file_name );
+							$is_processing      = in_array( $file->file_name, $processing_files, true );
+							$formatted_date     = mysql2date( get_option( 'date_format' ), $file->last_updated );
+							?>
+							<div class="ifaq-doc-item">
+								<div class="ifaq-doc-item-top">
+									<div class="ifaq-doc-title-wrap">
+										<strong class="ifaq-doc-filename"><?php echo esc_html( $file->file_name ); ?></strong>
+										<span class="ifaq-status-badge <?php echo $is_processing ? 'is-processing' : 'is-ready'; ?>" data-file-status="<?php echo esc_attr( $file->file_name ); ?>">
+											<span class="ifaq-status-dot" aria-hidden="true"></span>
+											<span class="ifaq-status-label"><?php echo $is_processing ? esc_html__( 'Processing...', 'infinibase' ) : esc_html__( 'Ready', 'infinibase' ); ?></span>
+										</span>
+									</div>
+									<form method="post" action="" class="ifaq-inline-form">
+										<?php wp_nonce_field( 'infinibase_delete_indexed_file', 'infinibase_delete_file_nonce' ); ?>
+										<input type="hidden" name="infinibase_delete_file_name" value="<?php echo esc_attr( $file->file_name ); ?>" />
+										<button type="submit" name="infinibase_delete_file_submit" value="1" class="button button-small button-link-delete ifaq-delete-btn" data-confirm="<?php echo esc_attr( $delete_confirm_msg ); ?>">
+											<?php esc_html_e( 'Delete', 'infinibase' ); ?>
+										</button>
+									</form>
+								</div>
+								<div class="ifaq-doc-meta">
+									<a href="<?php echo esc_url( $file->page_slug ); ?>" target="_blank" rel="noopener noreferrer" class="ifaq-doc-url"><?php echo esc_html( $file->page_slug ); ?></a>
+									<span class="ifaq-doc-sep" aria-hidden="true">&bull;</span>
+									<span>
+										<?php
+										/* translators: %d: Number of sections in the document. */
+										echo esc_html( sprintf( _n( '%d section', '%d sections', (int) $file->chunks, 'infinibase' ), (int) $file->chunks ) );
+										?>
+									</span>
+									<span class="ifaq-doc-sep" aria-hidden="true">&bull;</span>
+									<span>
+										<?php
+										/* translators: %s: Formatted last updated date. */
+										echo esc_html( sprintf( __( 'Updated %s', 'infinibase' ), $formatted_date ) );
+										?>
+									</span>
+								</div>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				<?php else : ?>
+					<p class="ifaq-doc-empty"><?php esc_html_e( 'No documents uploaded yet.', 'infinibase' ); ?></p>
+				<?php endif; ?>
 			</div>
 		</div>
 
@@ -793,6 +892,8 @@ function infinibase_ingestion_page_html() {
 				</p>
 			</form>
 		</div>
+
+		<?php infinibase_render_help_bar(); ?>
 	</div>
 	<?php
 }

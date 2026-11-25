@@ -3,8 +3,9 @@
  * Plugin Name: InfiniBase: AI FAQ & Knowledge Base
  * Plugin URI: https://allmytools.xyz/
  * Description: AI-powered FAQ knowledge base using your own API key (BYOK) or WordPress Core AI Client to generate accurate answers from your Markdown docs without hallucinations.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: THEWPBRO
+ * Author URI: https://eben.allmytools.xyz
  * License: GPLv2 or later
  * Text Domain: infinibase
  */
@@ -13,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'INFINIBASE_VERSION', '1.0.1' );
+define( 'INFINIBASE_VERSION', '1.0.2' );
 define( 'INFINIBASE_DB_VERSION', '1.1' );
 define( 'INFINIBASE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'INFINIBASE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -45,6 +46,9 @@ function infinibase_install_or_upgrade_db() {
 }
 
 function infinibase_maybe_upgrade_db() {
+	if ( false === get_option( 'infinibase_installed_at' ) ) {
+		add_option( 'infinibase_installed_at', time() );
+	}
 	if ( get_option( 'infinibase_db_version', '' ) !== INFINIBASE_DB_VERSION ) {
 		infinibase_install_or_upgrade_db();
 	}
@@ -53,6 +57,10 @@ add_action( 'plugins_loaded', 'infinibase_maybe_upgrade_db' );
 
 function infinibase_activate() {
 	infinibase_install_or_upgrade_db();
+
+	if ( false === get_option( 'infinibase_installed_at' ) ) {
+		add_option( 'infinibase_installed_at', time() );
+	}
 
 	if ( false === get_option( 'infinibase_support_url' ) ) {
 		add_option( 'infinibase_support_url', '' );
@@ -91,9 +99,168 @@ function infinibase_get_default_static_faqs() {
 }
 
 function infinibase_deactivate() {
+	wp_clear_scheduled_hook( 'infinibase_enrich_keywords_batch' );
+	delete_option( 'infinibase_pending_kw_ids' );
 	flush_rewrite_rules();
 }
 register_deactivation_hook( __FILE__, 'infinibase_deactivate' );
+
+function infinibase_extract_fallback_keywords( $chunk_text ) {
+	$stopwords = array(
+		'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was',
+		'our', 'out', 'get', 'has', 'him', 'his', 'how', 'now', 'see', 'way', 'who', 'did',
+		'its', 'let', 'put', 'say', 'she', 'too', 'use', 'what', 'when', 'where', 'which',
+		'while', 'with', 'your', 'from', 'have', 'this', 'that', 'they', 'will', 'would',
+		'there', 'their', 'about', 'could', 'into', 'than', 'then', 'them', 'these', 'some',
+		'such', 'only', 'very', 'just', 'does', 'section', 'please', 'must', 'also', 'more',
+	);
+
+	$plain  = wp_strip_all_tags( (string) $chunk_text );
+	$tokens = preg_split( '/[^a-z0-9]+/i', strtolower( $plain ) );
+	$picked = array();
+
+	if ( is_array( $tokens ) ) {
+		foreach ( $tokens as $token ) {
+			if ( strlen( $token ) < 3 || in_array( $token, $stopwords, true ) ) {
+				continue;
+			}
+			$picked[ $token ] = true;
+			if ( count( $picked ) >= 12 ) {
+				break;
+			}
+		}
+	}
+
+	if ( empty( $picked ) ) {
+		return sanitize_text_field( mb_substr( $plain, 0, 120 ) );
+	}
+
+	return sanitize_text_field( implode( ', ', array_keys( $picked ) ) );
+}
+
+function infinibase_generate_keywords_batch( $indexed_texts ) {
+	if ( empty( $indexed_texts ) || ! is_array( $indexed_texts ) ) {
+		return array();
+	}
+
+	$entries = array();
+	foreach ( $indexed_texts as $idx => $text ) {
+		$snippet   = mb_substr( trim( (string) $text ), 0, 1200 );
+		$entries[] = '[' . $idx . "]\n" . $snippet;
+	}
+
+	$system_prompt = 'You are a documentation indexing assistant. For each numbered documentation chunk, generate 5 to 10 highly relevant search keywords (including common synonyms a customer might search). Return ONLY a valid JSON object mapping each string index to its comma-separated keywords string, e.g. {"0":"keyword1, keyword2","1":"keyword3, keyword4"}. Do not include markdown code fences or extra commentary.';
+	$user_prompt   = "Documentation Chunks:\n\n" . implode( "\n\n---\n\n", $entries );
+
+	$raw_output = infinibase_request_ai_text( $user_prompt, $system_prompt, 1200, 18 );
+
+	if ( is_wp_error( $raw_output ) || ! is_string( $raw_output ) || '' === trim( $raw_output ) ) {
+		return array();
+	}
+
+	$cleaned = preg_replace( '/^```(?:json)?\s*|\s*```$/i', '', trim( $raw_output ) );
+	$decoded = json_decode( $cleaned, true );
+
+	if ( ! is_array( $decoded ) && preg_match( '/\{.*\}/s', $raw_output, $matches ) ) {
+		$decoded = json_decode( $matches[0], true );
+	}
+
+	if ( ! is_array( $decoded ) ) {
+		return array();
+	}
+
+	$results = array();
+	foreach ( $indexed_texts as $idx => $unused ) {
+		$key = (string) $idx;
+		if ( isset( $decoded[ $key ] ) && is_string( $decoded[ $key ] ) && '' !== trim( $decoded[ $key ] ) ) {
+			$results[ $idx ] = sanitize_text_field( $decoded[ $key ] );
+		} elseif ( isset( $decoded[ $idx ] ) && is_string( $decoded[ $idx ] ) && '' !== trim( $decoded[ $idx ] ) ) {
+			$results[ $idx ] = sanitize_text_field( $decoded[ $idx ] );
+		}
+	}
+
+	return $results;
+}
+
+function infinibase_enqueue_background_keywords( $chunk_ids ) {
+	if ( empty( $chunk_ids ) || ! is_array( $chunk_ids ) ) {
+		return;
+	}
+
+	$existing = get_option( 'infinibase_pending_kw_ids', array() );
+	if ( ! is_array( $existing ) ) {
+		$existing = array();
+	}
+
+	$merged = array_values( array_unique( array_filter( array_map( 'absint', array_merge( $existing, $chunk_ids ) ) ) ) );
+	if ( empty( $merged ) ) {
+		return;
+	}
+
+	update_option( 'infinibase_pending_kw_ids', $merged, false );
+
+	if ( ! wp_next_scheduled( 'infinibase_enrich_keywords_batch' ) ) {
+		wp_schedule_single_event( time() + 5, 'infinibase_enrich_keywords_batch' );
+	}
+}
+
+function infinibase_process_background_keyword_batch() {
+	$queue = get_option( 'infinibase_pending_kw_ids', array() );
+	if ( ! is_array( $queue ) || empty( $queue ) ) {
+		delete_option( 'infinibase_pending_kw_ids' );
+		return;
+	}
+
+	$batch_ids = array_slice( $queue, 0, 20 );
+	$remaining = array_slice( $queue, 20 );
+
+	if ( empty( $remaining ) ) {
+		delete_option( 'infinibase_pending_kw_ids' );
+	} else {
+		update_option( 'infinibase_pending_kw_ids', $remaining, false );
+	}
+
+	if ( ! infinibase_is_ai_connected() ) {
+		return;
+	}
+
+	global $wpdb;
+	$table_name    = $wpdb->prefix . 'infinibase_docs';
+	$indexed_texts = array();
+
+	foreach ( $batch_ids as $row_id ) {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$chunk_text = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT chunk_text FROM %i WHERE id = %d',
+				$table_name,
+				absint( $row_id )
+			)
+		);
+		if ( ! empty( $chunk_text ) ) {
+			$indexed_texts[ (int) $row_id ] = $chunk_text;
+		}
+	}
+
+	if ( ! empty( $indexed_texts ) ) {
+		$ai_keywords = infinibase_generate_keywords_batch( $indexed_texts );
+		foreach ( $ai_keywords as $row_id => $keywords ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->update(
+				$table_name,
+				array( 'keywords' => $keywords ),
+				array( 'id' => absint( $row_id ) ),
+				array( '%s' ),
+				array( '%d' )
+			);
+		}
+	}
+
+	if ( ! empty( $remaining ) && ! wp_next_scheduled( 'infinibase_enrich_keywords_batch' ) ) {
+		wp_schedule_single_event( time() + 5, 'infinibase_enrich_keywords_batch' );
+	}
+}
+add_action( 'infinibase_enrich_keywords_batch', 'infinibase_process_background_keyword_batch' );
 
 function infinibase_encrypt_data( $data ) {
 	if ( empty( $data ) ) {
@@ -335,6 +502,326 @@ function infinibase_request_ai_text( $user_prompt, $system_prompt = '', $max_tok
 	}
 
 	return $output;
+}
+
+function infinibase_test_ai_connection( $provider = '', $raw_key = '' ) {
+	if ( '' === $provider ) {
+		$provider = get_option( 'infinibase_ai_provider', 'openai' );
+	}
+
+	$provider_labels = array(
+		'wp_core'   => __( 'WordPress Core AI Client', 'infinibase' ),
+		'openai'    => 'OpenAI',
+		'anthropic' => 'Anthropic Claude',
+		'gemini'    => 'Google Gemini',
+		'deepseek'  => 'DeepSeek',
+	);
+	$label = isset( $provider_labels[ $provider ] ) ? $provider_labels[ $provider ] : ucfirst( $provider );
+
+	if ( 'wp_core' === $provider ) {
+		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'WordPress 7.0 or higher is required for the Core AI Client.', 'infinibase' ),
+			);
+		}
+		$builder = wp_ai_client_prompt( 'Reply with OK.' );
+		if ( ! method_exists( $builder, 'is_supported_for_text_generation' ) || ! $builder->is_supported_for_text_generation() ) {
+			return array(
+				'success' => false,
+				'message' => __( 'No active AI Connector found in WordPress Settings → Connectors.', 'infinibase' ),
+			);
+		}
+		$result = $builder->generate_text();
+		if ( is_wp_error( $result ) ) {
+			return array(
+				'success' => false,
+				'message' => $result->get_error_message(),
+			);
+		}
+		return array(
+			'success' => true,
+			/* translators: %s: AI provider display name. */
+			'message' => sprintf( __( 'Connected to %s!', 'infinibase' ), $label ),
+		);
+	}
+
+	$api_key = trim( (string) $raw_key );
+	if ( '' === $api_key || false !== strpos( $api_key, '*' ) ) {
+		$encrypted_key = get_option( 'infinibase_api_key', '' );
+		$api_key       = trim( (string) infinibase_decrypt_data( $encrypted_key ) );
+	}
+
+	if ( '' === $api_key ) {
+		return array(
+			'success' => false,
+			'message' => __( 'No API key provided. Please enter your API key to test the connection.', 'infinibase' ),
+		);
+	}
+
+	$response = null;
+	if ( 'openai' === $provider ) {
+		// phpcs:ignore PluginCheck.CodeAnalysis.AIProvider.DirectIntegration
+		$response = wp_remote_post(
+			'https://api.openai.com/v1/chat/completions',
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $api_key,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode(
+					array(
+						'model'      => 'gpt-4o-mini',
+						'max_tokens' => 5,
+						'messages'   => array( array( 'role' => 'user', 'content' => 'Reply OK.' ) ),
+					)
+				),
+				'timeout' => 12,
+			)
+		);
+	} elseif ( 'anthropic' === $provider ) {
+		// phpcs:ignore PluginCheck.CodeAnalysis.AIProvider.DirectIntegration
+		$response = wp_remote_post(
+			'https://api.anthropic.com/v1/messages',
+			array(
+				'headers' => array(
+					'x-api-key'         => $api_key,
+					'anthropic-version' => '2023-06-01',
+					'Content-Type'      => 'application/json',
+				),
+				'body'    => wp_json_encode(
+					array(
+						'model'      => 'claude-haiku-4-5-20251001',
+						'max_tokens' => 5,
+						'messages'   => array( array( 'role' => 'user', 'content' => 'Reply OK.' ) ),
+					)
+				),
+				'timeout' => 12,
+			)
+		);
+	} elseif ( 'gemini' === $provider ) {
+		// phpcs:ignore PluginCheck.CodeAnalysis.AIProvider.DirectIntegration
+		$response = wp_remote_post(
+			'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+			array(
+				'headers' => array(
+					'Content-Type'   => 'application/json',
+					'x-goog-api-key' => $api_key,
+				),
+				'body'    => wp_json_encode(
+					array(
+						'contents' => array(
+							array(
+								'role'  => 'user',
+								'parts' => array( array( 'text' => 'Reply OK.' ) ),
+							),
+						),
+					)
+				),
+				'timeout' => 12,
+			)
+		);
+	} elseif ( 'deepseek' === $provider ) {
+		// phpcs:ignore PluginCheck.CodeAnalysis.AIProvider.DirectIntegration
+		$response = wp_remote_post(
+			'https://api.deepseek.com/chat/completions',
+			array(
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $api_key,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode(
+					array(
+						'model'      => 'deepseek-flash',
+						'max_tokens' => 5,
+						'messages'   => array( array( 'role' => 'user', 'content' => 'Reply OK.' ) ),
+					)
+				),
+				'timeout' => 12,
+			)
+		);
+	}
+
+	if ( is_wp_error( $response ) ) {
+		return array(
+			'success' => false,
+			'message' => $response->get_error_message(),
+		);
+	}
+
+	$http_code = (int) wp_remote_retrieve_response_code( $response );
+	$raw_body  = wp_remote_retrieve_body( $response );
+	$body      = json_decode( $raw_body, true );
+
+	if ( $http_code >= 200 && $http_code < 300 ) {
+		return array(
+			'success' => true,
+			/* translators: %s: AI provider display name. */
+			'message' => sprintf( __( 'Connected to %s!', 'infinibase' ), $label ),
+		);
+	}
+
+	$provider_error = '';
+	if ( isset( $body['error']['message'] ) && is_string( $body['error']['message'] ) ) {
+		$provider_error = trim( $body['error']['message'] );
+	} elseif ( isset( $body['message'] ) && is_string( $body['message'] ) ) {
+		$provider_error = trim( $body['message'] );
+	}
+
+	if ( '' === $provider_error ) {
+		/* translators: 1: AI provider name, 2: HTTP status code. */
+		$provider_error = sprintf( __( '%1$s returned HTTP %2$d. Please verify your API key and account billing status.', 'infinibase' ), $label, $http_code );
+	}
+
+	return array(
+		'success' => false,
+		'message' => sanitize_text_field( $provider_error ),
+	);
+}
+
+function infinibase_plugin_action_links( $links ) {
+	$custom_links = array(
+		'<a href="' . esc_url( admin_url( 'admin.php?page=infinibase' ) ) . '">' . esc_html__( 'Settings', 'infinibase' ) . '</a>',
+		'<a href="' . esc_url( admin_url( 'admin.php?page=infinibase-ingestion' ) ) . '">' . esc_html__( 'Knowledge Base', 'infinibase' ) . '</a>',
+	);
+	return array_merge( $custom_links, $links );
+}
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'infinibase_plugin_action_links' );
+
+function infinibase_plugin_row_meta( $links, $file ) {
+	if ( plugin_basename( __FILE__ ) === $file ) {
+		$links[] = '<a href="https://www.youtube.com/@thewpbro" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Video Tutorials', 'infinibase' ) . '</a>';
+		$links[] = '<a href="https://wordpress.org/support/plugin/infinibase/" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Report a Bug', 'infinibase' ) . '</a>';
+		$links[] = '<a href="https://wordpress.org/support/plugin/infinibase/reviews/#new-post" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Rate ★★★★★', 'infinibase' ) . '</a>';
+	}
+	return $links;
+}
+add_filter( 'plugin_row_meta', 'infinibase_plugin_row_meta', 10, 2 );
+
+function infinibase_admin_footer_text( $footer_text ) {
+	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+	if ( ! $screen || false === strpos( (string) $screen->id, 'infinibase' ) ) {
+		return $footer_text;
+	}
+
+	return sprintf(
+		/* translators: 1: WordPress.org review URL, 2: Creator URL. */
+		__( 'Enjoying <strong>InfiniBase</strong>? Leave a <a href="%1$s" target="_blank" rel="noopener noreferrer">★★★★★ review</a> on WordPress.org &bull; Built by <a href="%2$s" target="_blank" rel="noopener noreferrer">THEWPBRO</a>.', 'infinibase' ),
+		esc_url( 'https://wordpress.org/support/plugin/infinibase/reviews/#new-post' ),
+		esc_url( 'https://eben.allmytools.xyz' )
+	);
+}
+add_filter( 'admin_footer_text', 'infinibase_admin_footer_text' );
+
+function infinibase_should_show_review_banner() {
+	if ( 'dismissed' === get_option( 'infinibase_review_status', '' ) ) {
+		return false;
+	}
+
+	$snooze_until = (int) get_option( 'infinibase_review_snooze_until', 0 );
+	if ( $snooze_until > time() ) {
+		return false;
+	}
+
+	$installed_at = (int) get_option( 'infinibase_installed_at', 0 );
+	if ( $installed_at <= 0 || ( time() - $installed_at ) < ( 7 * DAY_IN_SECONDS ) ) {
+		return false;
+	}
+
+	global $wpdb;
+	$table_name = $wpdb->prefix . 'infinibase_docs';
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$doc_count = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(id) FROM %i', $table_name ) );
+
+	return $doc_count > 0;
+}
+
+function infinibase_render_review_banner() {
+	if ( ! infinibase_should_show_review_banner() ) {
+		return;
+	}
+	?>
+	<div id="infinibase-review-banner" class="notice notice-info ifaq-review-banner">
+		<p>
+			<strong><?php esc_html_e( 'Enjoying InfiniBase?', 'infinibase' ); ?></strong>
+			<?php esc_html_e( 'If it is helping your visitors find answers faster, a quick 5-star review on WordPress.org helps other site owners discover it.', 'infinibase' ); ?>
+		</p>
+		<p class="ifaq-review-actions">
+			<a href="https://wordpress.org/support/plugin/infinibase/reviews/#new-post" target="_blank" rel="noopener noreferrer" class="button button-primary ifaq-review-btn" data-review-action="dismiss">
+				<?php esc_html_e( 'Leave a 5-Star Review ★', 'infinibase' ); ?>
+			</a>
+			<button type="button" class="button ifaq-review-btn" data-review-action="snooze">
+				<?php esc_html_e( 'Maybe Later', 'infinibase' ); ?>
+			</button>
+			<button type="button" class="button-link ifaq-review-btn" data-review-action="dismiss">
+				<?php esc_html_e( 'Already did / Don’t show again', 'infinibase' ); ?>
+			</button>
+		</p>
+	</div>
+	<?php
+}
+
+function infinibase_ajax_review_action() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+	}
+
+	check_ajax_referer( 'infinibase_status_check', 'nonce' );
+
+	$action = isset( $_POST['review_action'] ) ? sanitize_key( wp_unslash( $_POST['review_action'] ) ) : '';
+	if ( 'snooze' === $action ) {
+		update_option( 'infinibase_review_snooze_until', time() + ( 14 * DAY_IN_SECONDS ) );
+	} else {
+		update_option( 'infinibase_review_status', 'dismissed' );
+	}
+
+	wp_send_json_success();
+}
+add_action( 'wp_ajax_infinibase_review_action', 'infinibase_ajax_review_action' );
+
+function infinibase_get_debug_info_text() {
+	global $wpdb, $wp_version;
+	$table_name = $wpdb->prefix . 'infinibase_docs';
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$stats      = $wpdb->get_row( $wpdb->prepare( 'SELECT COUNT(DISTINCT file_name) AS doc_count, COUNT(id) AS section_count FROM %i', $table_name ) );
+	$provider   = get_option( 'infinibase_ai_provider', 'openai' );
+	$connected  = infinibase_is_ai_connected() ? 'Yes' : 'No';
+
+	$lines = array(
+		'InfiniBase Version: ' . INFINIBASE_VERSION,
+		'WordPress Version: ' . $wp_version,
+		'PHP Version: ' . PHP_VERSION,
+		'AI Provider: ' . $provider . ' (Connected: ' . $connected . ')',
+		'Uploaded Documents: ' . ( $stats ? (int) $stats->doc_count : 0 ) . ' (' . ( $stats ? (int) $stats->section_count : 0 ) . ' sections)',
+		'DB Schema Version: ' . get_option( 'infinibase_db_version', '1.0' ),
+	);
+
+	return implode( "\n", $lines );
+}
+
+function infinibase_render_help_bar() {
+	$debug_info = infinibase_get_debug_info_text();
+	?>
+	<div class="card ifaq-help-bar">
+		<div class="ifaq-help-bar-inner">
+			<div class="ifaq-help-bar-text">
+				<strong><?php esc_html_e( 'Need Help or Found a Bug?', 'infinibase' ); ?></strong>
+				<span><?php esc_html_e( 'Report issues on the WordPress.org support forum or watch setup tutorials on YouTube.', 'infinibase' ); ?></span>
+			</div>
+			<div class="ifaq-help-bar-actions">
+				<a href="https://wordpress.org/support/plugin/infinibase/" target="_blank" rel="noopener noreferrer" class="button">
+					<?php esc_html_e( 'Report a Bug / Support', 'infinibase' ); ?>
+				</a>
+				<a href="https://www.youtube.com/@thewpbro" target="_blank" rel="noopener noreferrer" class="button">
+					<?php esc_html_e( 'Watch Tutorials (@thewpbro)', 'infinibase' ); ?>
+				</a>
+				<button type="button" class="button ifaq-copy-debug-btn" data-debug-info="<?php echo esc_attr( $debug_info ); ?>">
+					<span class="ifaq-debug-copy-label"><?php esc_html_e( 'Copy Debug Info', 'infinibase' ); ?></span>
+				</button>
+			</div>
+		</div>
+	</div>
+	<?php
 }
 
 require_once INFINIBASE_PLUGIN_DIR . 'includes/rest-api.php';

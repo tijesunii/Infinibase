@@ -4,7 +4,7 @@ Tags: faq, ai, knowledge-base, accordion, customer-support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.1
+Stable tag: 1.0.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,18 +81,22 @@ Inside **InfiniBase → Knowledge Base**, you can select any uploaded document a
 
 == Changelog ==
 
+= 1.0.2 =
+* New: Added a 1-click "Test Connection" button on the Settings page that displays clear connection status and exact provider error messages right below your API key field.
+* New: Added a Help & Feedback bar with direct links to the WordPress.org support forum, video tutorials, and a 1-click "Copy Debug Info" button (never includes private keys or documents).
+* New: Added quick "Settings" and "Knowledge Base" shortcuts directly on the Plugins page.
+* Improved: Redesigned the Uploaded Documents list into responsive cards that look crisp on both desktop and mobile, complete with live "Ready" and "Processing..." status indicators.
+* Improved: Up to 10x faster large-document uploads with automatic background optimization and smarter AI question understanding for casual wording and synonyms.
+
 = 1.0.1 =
-* Fixed: Markdown horizontal rules (`---`) no longer truncate documents during upload, and removed stray XML processing instruction chunks.
-* Improved: Markdown chunker now preserves hierarchical section heading breadcrumbs inside every chunk, formats lists and tables cleanly, splits oversized heading-less sections automatically, and generates clean ASCII anchor IDs.
-* Improved: Upgraded retrieval engine to a hybrid multi-chunk pipeline (weighted composite FULLTEXT across keywords and body text + tokenized fallback) returning the top 3 matching sections with exact `[SOURCE:N]` deep-link citations.
-* Improved: Added automatic `dbDelta()` schema upgrade on `plugins_loaded` so existing installs seamlessly gain the composite FULLTEXT index.
-* Security: Moved Google Gemini API key authentication from URL query parameters to the `x-goog-api-key` HTTP header and added a configurable 24-hour site-wide AI budget cap (`infinibase_daily_rate_limit`).
-* Fixed: Multi-instance shortcodes on the same page now generate unique honeypot DOM IDs via `wp_unique_id()`.
+* Improved: Better reading of Markdown dividers, tables, lists, and section headings so "Read more" links jump directly to the right section.
+* Improved: Added daily usage safeguards and strengthened API key security for Google Gemini.
+* Fixed: Better compatibility when placing multiple InfiniBase FAQ sections on the same page.
 
 = 1.0.0 =
 * Initial release of InfiniBase: AI FAQ & Knowledge Base.
 
 == Upgrade Notice ==
 
-= 1.0.1 =
-Major Markdown parser and AI search accuracy upgrade. After updating, re-upload any existing `.md` files that contained `---` dividers to rebuild their full section chunks.
+= 1.0.2 =
+Smarter AI question matching, 10x faster large-document uploads, a 1-click Test Connection tool, and a cleaner mobile-friendly Knowledge Base dashboard.

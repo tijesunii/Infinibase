@@ -20,6 +20,30 @@ function infinibase_add_admin_menu() {
 }
 add_action( 'admin_menu', 'infinibase_add_admin_menu' );
 
+function infinibase_ajax_test_connection() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Unauthorized.', 'infinibase' ) ), 403 );
+	}
+
+	check_ajax_referer( 'infinibase_status_check', 'nonce' );
+
+	$allowed_providers = array( 'wp_core', 'openai', 'anthropic', 'gemini', 'deepseek' );
+	$provider          = isset( $_POST['provider'] ) ? sanitize_text_field( wp_unslash( $_POST['provider'] ) ) : '';
+	if ( ! in_array( $provider, $allowed_providers, true ) ) {
+		$provider = get_option( 'infinibase_ai_provider', 'openai' );
+	}
+
+	$raw_key = isset( $_POST['api_key'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['api_key'] ) ) ) : '';
+	$result  = infinibase_test_ai_connection( $provider, $raw_key );
+
+	if ( ! empty( $result['success'] ) ) {
+		wp_send_json_success( array( 'message' => $result['message'] ) );
+	}
+
+	wp_send_json_error( array( 'message' => $result['message'] ) );
+}
+add_action( 'wp_ajax_infinibase_test_connection', 'infinibase_ajax_test_connection' );
+
 function infinibase_settings_page_html() {
 	if ( ! current_user_can( 'manage_options' ) ) {
 		return;
@@ -68,6 +92,7 @@ function infinibase_settings_page_html() {
 	?>
 	<div class="wrap">
 		<h1><?php esc_html_e( 'InfiniBase Settings', 'infinibase' ); ?></h1>
+		<?php infinibase_render_review_banner(); ?>
 		<form method="post" action="">
 			<?php wp_nonce_field( 'infinibase_save_settings', 'infinibase_settings_nonce' ); ?>
 
@@ -115,6 +140,7 @@ function infinibase_settings_page_html() {
 					<td>
 						<input type="password" name="infinibase_api_key" id="infinibase_api_key" value="<?php echo esc_attr( $masked_key ); ?>" class="regular-text" autocomplete="off" />
 						<p class="description"><?php esc_html_e( 'Your API Key is stored encrypted at rest. Used when OpenAI, Anthropic, Google Gemini, or DeepSeek is selected above.', 'infinibase' ); ?></p>
+						<div id="infinibase-connection-status" class="ifaq-connection-status" aria-live="polite"></div>
 					</td>
 				</tr>
 				<tr>
@@ -136,8 +162,16 @@ function infinibase_settings_page_html() {
 				</tr>
 			</table>
 
-			<?php submit_button( esc_html__( 'Save Settings', 'infinibase' ), 'primary', 'infinibase_submit' ); ?>
+			<div class="ifaq-settings-actions">
+				<?php submit_button( esc_html__( 'Save Settings', 'infinibase' ), 'primary', 'infinibase_submit', false ); ?>
+				<button type="button" id="infinibase-test-connection-btn" class="button">
+					<?php esc_html_e( 'Test Connection', 'infinibase' ); ?>
+				</button>
+			</div>
+			<div id="infinibase-wp-core-test-status" class="ifaq-connection-status" aria-live="polite"></div>
 		</form>
+
+		<?php infinibase_render_help_bar(); ?>
 	</div>
 	<?php
 }

@@ -198,6 +198,76 @@ function infinibase_find_relevant_chunks( $question, $table_name, $limit = 3 ) {
 	);
 }
 
+function infinibase_route_chunks_with_ai( $question, $table_name, $limit = 3 ) {
+	global $wpdb;
+
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+	$all_rows = $wpdb->get_results(
+		$wpdb->prepare(
+			'SELECT id, page_slug, anchor_id, chunk_text, keywords FROM %i ORDER BY id ASC LIMIT 150',
+			$table_name
+		)
+	);
+
+	if ( empty( $all_rows ) ) {
+		return array();
+	}
+
+	$rows_by_id = array();
+	$toc_lines  = array();
+
+	foreach ( $all_rows as $row ) {
+		$row_id                = (int) $row->id;
+		$rows_by_id[ $row_id ] = $row;
+
+		$first_line = strtok( trim( (string) $row->chunk_text ), "\n" );
+		if ( false === $first_line || '' === trim( $first_line ) ) {
+			$first_line = $row->anchor_id;
+		}
+		$first_line = mb_substr( trim( $first_line ), 0, 140 );
+		$kw_preview = mb_substr( trim( (string) $row->keywords ), 0, 180 );
+
+		$toc_lines[] = "ID {$row_id}: {$first_line} | Keywords: {$kw_preview}";
+	}
+
+	$router_system = "You are a strict documentation search router. Given a user's question and a list of documentation sections (each with an ID, title, and keywords), select up to {$limit} section IDs that are most likely to contain the answer. Understand synonyms, paraphrasing, and user intent (for example, 'specifications', 'specs', or 'details' matches product dimensions, weight capacity, materials, or features). Return ONLY a valid JSON array of integer IDs ordered from most relevant to least relevant, e.g. [8] or [5, 2]. If NO section in the list could possibly answer the question, return []. Do not include any explanation or markdown.";
+	$router_user   = "Question: {$question}\n\nDocumentation Sections:\n" . implode( "\n", $toc_lines );
+
+	$router_output = infinibase_request_ai_text( $router_user, $router_system, 60, 12 );
+
+	if ( is_wp_error( $router_output ) ) {
+		return $router_output;
+	}
+
+	if ( ! is_string( $router_output ) || '' === trim( $router_output ) ) {
+		return infinibase_find_relevant_chunks( $question, $table_name, $limit );
+	}
+
+	$cleaned = preg_replace( '/^```(?:json)?\s*|\s*```$/i', '', trim( $router_output ) );
+	$decoded = json_decode( $cleaned, true );
+
+	if ( ! is_array( $decoded ) && preg_match( '/\[[0-9,\s]*\]/', $router_output, $matches ) ) {
+		$decoded = json_decode( $matches[0], true );
+	}
+
+	if ( ! is_array( $decoded ) ) {
+		return infinibase_find_relevant_chunks( $question, $table_name, $limit );
+	}
+
+	$selected_chunks = array();
+	foreach ( $decoded as $candidate_id ) {
+		$cid = (int) $candidate_id;
+		if ( isset( $rows_by_id[ $cid ] ) && ! isset( $selected_chunks[ $cid ] ) ) {
+			$selected_chunks[ $cid ] = $rows_by_id[ $cid ];
+			if ( count( $selected_chunks ) >= $limit ) {
+				break;
+			}
+		}
+	}
+
+	return array_values( $selected_chunks );
+}
+
 function infinibase_process_question( WP_REST_Request $request ) {
 	$validation = infinibase_validate_public_request( $request );
 	if ( is_wp_error( $validation ) ) {
@@ -257,10 +327,10 @@ function infinibase_process_question( WP_REST_Request $request ) {
 	global $wpdb;
 	$table_name  = $wpdb->prefix . 'infinibase_docs';
 	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$kb_count    = $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(id) FROM %i', $table_name ) );
+	$kb_stats    = $wpdb->get_row( $wpdb->prepare( 'SELECT COUNT(id) AS total_rows, MAX(id) AS max_id FROM %i', $table_name ) );
 	$support_url = get_option( 'infinibase_support_url', '' );
 
-	if ( ! $kb_count || 0 == $kb_count ) {
+	if ( ! $kb_stats || 0 === (int) $kb_stats->total_rows ) {
 		return rest_ensure_response(
 			array(
 				'success'  => false,
@@ -270,20 +340,7 @@ function infinibase_process_question( WP_REST_Request $request ) {
 		);
 	}
 
-	$top_chunks = infinibase_find_relevant_chunks( $sanitized_question, $table_name, 3 );
-
-	if ( empty( $top_chunks ) ) {
-		return rest_ensure_response(
-			array(
-				'success'  => false,
-				'answer'   => 'I couldn\'t find that information in the available documentation.',
-				'citation' => $support_url,
-			)
-		);
-	}
-
-	$chunk_ids_sig = implode( '-', wp_list_pluck( $top_chunks, 'id' ) );
-	$cache_key     = 'infinibase_ans_' . md5( strtolower( $sanitized_question ) . '_' . $chunk_ids_sig . '_' . get_option( 'infinibase_answer_length', 'Brief' ) );
+	$cache_key     = 'infinibase_ans_' . md5( strtolower( $sanitized_question ) . '_' . (int) $kb_stats->total_rows . '_' . (int) $kb_stats->max_id . '_' . get_option( 'infinibase_answer_length', 'Brief' ) );
 	$cached_answer = get_transient( $cache_key );
 
 	if ( false !== $cached_answer && is_array( $cached_answer ) ) {
@@ -303,6 +360,31 @@ function infinibase_process_question( WP_REST_Request $request ) {
 	}
 
 	set_transient( $daily_transient_key, $daily_attempts + 1, DAY_IN_SECONDS );
+
+	$top_chunks = infinibase_route_chunks_with_ai( $sanitized_question, $table_name, 3 );
+
+	if ( is_wp_error( $top_chunks ) ) {
+		if ( in_array( $top_chunks->get_error_code(), array( 'missing_api_key', 'wp_ai_client_unavailable', 'wp_ai_client_unconfigured' ), true ) ) {
+			return rest_ensure_response(
+				array(
+					'success'  => false,
+					'answer'   => 'The AI Knowledge Base is currently unconfigured. Please contact support.',
+					'citation' => $support_url,
+				)
+			);
+		}
+		$top_chunks = infinibase_find_relevant_chunks( $sanitized_question, $table_name, 3 );
+	}
+
+	if ( empty( $top_chunks ) ) {
+		$fallback_payload = array(
+			'success'  => false,
+			'answer'   => 'I couldn\'t find that information in the available documentation.',
+			'citation' => $support_url,
+		);
+		set_transient( $cache_key, $fallback_payload, HOUR_IN_SECONDS );
+		return rest_ensure_response( $fallback_payload );
+	}
 
 	$context_parts = array();
 	foreach ( $top_chunks as $idx => $chunk ) {

@@ -75,4 +75,165 @@
 			e.preventDefault();
 		}
 	});
+
+	function pollProcessingStatus() {
+		var processingBadges = document.querySelectorAll('.ifaq-status-badge.is-processing');
+		if (!processingBadges.length || typeof window.infinibaseAdminData === 'undefined') {
+			return;
+		}
+
+		var body = new URLSearchParams();
+		body.append('action', 'infinibase_check_status');
+		body.append('nonce', window.infinibaseAdminData.nonce || '');
+
+		fetch(window.infinibaseAdminData.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body.toString()
+		})
+			.then(function (res) {
+				return res.json();
+			})
+			.then(function (payload) {
+				if (!payload || !payload.success || !payload.data) {
+					return;
+				}
+				var stillProcessing = payload.data.processingFiles || [];
+				document.querySelectorAll('.ifaq-status-badge[data-file-status]').forEach(function (badge) {
+					var fname = badge.getAttribute('data-file-status');
+					var label = badge.querySelector('.ifaq-status-label');
+					if (stillProcessing.indexOf(fname) === -1) {
+						badge.classList.remove('is-processing');
+						badge.classList.add('is-ready');
+						if (label) {
+							label.textContent = 'Ready';
+						}
+					}
+				});
+
+				if (!payload.data.allReady) {
+					setTimeout(pollProcessingStatus, 3000);
+				}
+			})
+			.catch(function () {
+				setTimeout(pollProcessingStatus, 5000);
+			});
+	}
+
+	if (document.querySelectorAll('.ifaq-status-badge.is-processing').length > 0) {
+		setTimeout(pollProcessingStatus, 2500);
+	}
+
+	var testConnBtn = document.getElementById('infinibase-test-connection-btn');
+	if (testConnBtn && typeof window.infinibaseAdminData !== 'undefined') {
+		testConnBtn.addEventListener('click', function () {
+			var providerEl = document.getElementById('infinibase_ai_provider');
+			var keyEl = document.getElementById('infinibase_api_key');
+			var providerVal = providerEl ? providerEl.value : '';
+			var statusEl =
+				providerVal === 'wp_core'
+					? document.getElementById('infinibase-wp-core-test-status')
+					: document.getElementById('infinibase-connection-status');
+			var otherStatusEl =
+				providerVal === 'wp_core'
+					? document.getElementById('infinibase-connection-status')
+					: document.getElementById('infinibase-wp-core-test-status');
+
+			if (otherStatusEl) {
+				otherStatusEl.textContent = '';
+				otherStatusEl.className = 'ifaq-connection-status';
+			}
+
+			testConnBtn.disabled = true;
+			testConnBtn.textContent = 'Testing...';
+			if (statusEl) {
+				statusEl.className = 'ifaq-connection-status is-testing';
+				statusEl.textContent = 'Testing connection...';
+			}
+
+			var body = new URLSearchParams();
+			body.append('action', 'infinibase_test_connection');
+			body.append('nonce', window.infinibaseAdminData.nonce || '');
+			body.append('provider', providerVal);
+			body.append('api_key', keyEl ? keyEl.value : '');
+
+			fetch(window.infinibaseAdminData.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body.toString()
+			})
+				.then(function (res) {
+					return res.json();
+				})
+				.then(function (payload) {
+					testConnBtn.disabled = false;
+					testConnBtn.textContent = 'Test Connection';
+					if (!statusEl) {
+						return;
+					}
+					var msg =
+						payload && payload.data && payload.data.message
+							? payload.data.message
+							: 'Unable to test connection.';
+					if (payload && payload.success) {
+						statusEl.className = 'ifaq-connection-status is-success';
+					} else {
+						statusEl.className = 'ifaq-connection-status is-error';
+					}
+					statusEl.textContent = msg;
+				})
+				.catch(function () {
+					testConnBtn.disabled = false;
+					testConnBtn.textContent = 'Test Connection';
+					if (statusEl) {
+						statusEl.className = 'ifaq-connection-status is-error';
+						statusEl.textContent = 'Network error while testing connection.';
+					}
+				});
+		});
+	}
+
+	document.querySelectorAll('.ifaq-review-btn').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			var action = btn.getAttribute('data-review-action') || 'dismiss';
+			var banner = document.getElementById('infinibase-review-banner');
+			if (banner) {
+				banner.style.display = 'none';
+			}
+			if (typeof window.infinibaseAdminData === 'undefined') {
+				return;
+			}
+			var body = new URLSearchParams();
+			body.append('action', 'infinibase_review_action');
+			body.append('nonce', window.infinibaseAdminData.nonce || '');
+			body.append('review_action', action);
+
+			fetch(window.infinibaseAdminData.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body.toString()
+			});
+		});
+	});
+
+	document.querySelectorAll('.ifaq-copy-debug-btn').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			var info = btn.getAttribute('data-debug-info');
+			var label = btn.querySelector('.ifaq-debug-copy-label');
+			if (!info) {
+				return;
+			}
+			copyTextToClipboard(info).then(function () {
+				if (label) {
+					label.textContent = 'Copied Debug Info!';
+					setTimeout(function () {
+						label.textContent = 'Copy Debug Info';
+					}, 2000);
+				}
+			});
+		});
+	});
 })();
