@@ -48,7 +48,7 @@ Depending on which provider you select, requests are sent to one of the followin
 * **Google Gemini** (`generativelanguage.googleapis.com`): [Website](https://ai.google.dev/) | [Terms](https://ai.google.dev/gemini-api/terms) | [Privacy Policy](https://policies.google.com/privacy)
 * **DeepSeek** (`api.deepseek.com`): [Website](https://platform.deepseek.com/) | [Terms](https://cdn.deepseek.com/policies/en-US/deepseek-open-platform-terms-of-service.html) | [Privacy Policy](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html)
 
-Open-source development repository: https://github.com/tijesunii/Infinite-FAQs
+Open-source development repository: https://github.com/tijesunii/Infinibase
 
 == Installation ==
 
