@@ -82,11 +82,12 @@ Inside **InfiniBase → Knowledge Base**, you can select any uploaded document a
 == Changelog ==
 
 = 1.0.2 =
-* New: Added a 1-click "Test Connection" button on the Settings page that displays clear connection status and exact provider error messages right below your API key field.
-* New: Added a Help & Feedback bar with direct links to the WordPress.org support forum, video tutorials, and a 1-click "Copy Debug Info" button (never includes private keys or documents).
+* New: Refreshed the entire InfiniBase admin experience with a cleaner, calmer layout, organized tabs for both Knowledge Base and Settings, visual Light & Dark shortcode preview cards, and selectable AI Provider tiles.
+* New: Added a 1-click "Test Connection" button on the Settings page that confirms your setup or shows clear error messages right below your API key.
+* New: Added a dedicated Support & Diagnostics tab with direct links to the WordPress.org support forum, setup video tutorials, and a 1-click "Copy Debug Info" button (never includes private keys or documents).
 * New: Added quick "Settings" and "Knowledge Base" shortcuts directly on the Plugins page.
-* Improved: Redesigned the Uploaded Documents list into responsive cards that look crisp on both desktop and mobile, complete with live "Ready" and "Processing..." status indicators.
-* Improved: Up to 10x faster large-document uploads with automatic background optimization and smarter AI question understanding for casual wording and synonyms.
+* Improved: Up to 10x faster uploads for large documentation files with automatic background optimization and live "Optimizing..." / "Ready" status indicators.
+* Improved: Smarter AI question understanding so visitors get accurate answers even when they use casual wording or synonyms.
 
 = 1.0.1 =
 * Improved: Better reading of Markdown dividers, tables, lists, and section headings so "Read more" links jump directly to the right section.
@@ -99,7 +100,7 @@ Inside **InfiniBase → Knowledge Base**, you can select any uploaded document a
 == Upgrade Notice ==
 
 = 1.0.2 =
-Smarter AI question matching, 10x faster large-document uploads, a 1-click Test Connection tool, and a cleaner mobile-friendly Knowledge Base dashboard.
+A brand-new admin design, smarter AI question matching, 10x faster large-document uploads, and a 1-click Test Connection tool.
 
 == Credits ==
 
