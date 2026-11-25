@@ -78,7 +78,7 @@ function infinibase_settings_page_html() {
 		$keep_data = isset( $_POST['infinibase_keep_data_on_uninstall'] ) ? '1' : '0';
 		update_option( 'infinibase_keep_data_on_uninstall', $keep_data );
 
-		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved securely.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'Settings saved securely.', 'infinibase' ), 'success' );
 	}
 
 	$current_provider = get_option( 'infinibase_ai_provider', 'openai' );
@@ -104,6 +104,7 @@ function infinibase_settings_page_html() {
 		</section>
 
 		<div class="ifaq-container">
+			<?php infinibase_render_admin_notices(); ?>
 			<?php infinibase_render_review_banner(); ?>
 
 			<div class="ifaq-kb-layout">

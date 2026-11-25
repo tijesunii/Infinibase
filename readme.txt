@@ -75,9 +75,11 @@ Inside **InfiniBase → Knowledge Base**, you can select any uploaded document a
 
 1. Light Mode (`[infinibase_light]`) — Clean two-column FAQ accordion with instant AI search and deep-link documentation citations.
 2. Dark Mode (`[infinibase_dark]`) — Built-in dark theme ready for modern WordPress themes, Gutenberg, and Elementor.
-3. InfiniBase Settings — Connect via WordPress Core AI Connectors or Bring Your Own Key (OpenAI, Anthropic, Google Gemini, DeepSeek).
-4. Knowledge Base Management — One-click shortcode copy, Markdown (`.md`) documentation uploader, and indexed file manager.
-5. Shortcode Display & 1-Click AI FAQ Generator — Customize your section heading/subtitle and auto-generate 4 predefined FAQ cards from your docs.
+3. Knowledge Base — Documents — Upload Markdown documentation, track live Ready / Optimizing status, and copy Light or Dark embed shortcodes in one click.
+4. Knowledge Base — FAQ Cards & Display — Customize your section heading and subtitle, generate 4 starter FAQs with AI, and manage predefined FAQ cards.
+5. Settings — AI Provider — Choose WordPress Core AI Connectors or Bring Your Own Key (OpenAI, Anthropic, Google Gemini, DeepSeek) with a 1-click Test Connection check.
+6. Settings — Behavior & Safety — Pick Brief or Standard answer styles, configure your Contact Support fallback URL, and control data retention on uninstall.
+7. Settings — Support & Diagnostics — Copy a safe, key-free system snapshot in one click when requesting help on the WordPress.org support forum.
 
 == Changelog ==
 

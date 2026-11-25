@@ -283,12 +283,12 @@ function infinibase_handle_upload() {
 	}
 
 	if ( ! infinibase_is_ai_connected() ) {
-		echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Please connect an AI Provider in InfiniBase → Settings (either via WordPress Settings → Connectors or a BYOK API Key) before uploading documentation.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'Please connect an AI Provider in Settings before uploading documentation.', 'infinibase' ), 'error' );
 		return;
 	}
 
 	if ( ! isset( $_FILES['infinibase_md_file']['tmp_name'], $_FILES['infinibase_md_file']['name'] ) || empty( $_FILES['infinibase_md_file']['tmp_name'] ) ) {
-		echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Please select a file.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'Please select a file.', 'infinibase' ), 'error' );
 		return;
 	}
 
@@ -297,13 +297,13 @@ function infinibase_handle_upload() {
 	$uploaded_tmp_name  = $_FILES['infinibase_md_file']['tmp_name'];
 
 	if ( ! is_uploaded_file( $uploaded_tmp_name ) ) {
-		echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Invalid file upload.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'Invalid file upload.', 'infinibase' ), 'error' );
 		return;
 	}
 
 	$filetype = wp_check_filetype( $uploaded_file_name, array( 'md' => 'text/markdown' ) );
 	if ( 'md' !== $filetype['ext'] ) {
-		echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Only .md files are allowed.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'Only .md files are allowed.', 'infinibase' ), 'error' );
 		return;
 	}
 
@@ -311,7 +311,7 @@ function infinibase_handle_upload() {
 	if ( ! empty( $_POST['infinibase_base_page_url'] ) ) {
 		$base_page_url = esc_url_raw( wp_unslash( $_POST['infinibase_base_page_url'] ) );
 	} else {
-		echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Base Page URL is required.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'Base Page URL is required.', 'infinibase' ), 'error' );
 		return;
 	}
 
@@ -380,17 +380,23 @@ function infinibase_handle_upload() {
 	}
 
 	if ( ! empty( $pending_bg_ids ) ) {
-		echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-			/* translators: %s: Uploaded Markdown file name. */
-			esc_html__( 'Uploaded "%s" — your docs are live now and finishing optimization in the background.', 'infinibase' ),
-			esc_html( $file_name )
-		) . '</p></div>';
+		infinibase_add_admin_notice(
+			sprintf(
+				/* translators: %s: Uploaded Markdown file name. */
+				__( 'Uploaded "%s" — your docs are live now and finishing optimization in the background.', 'infinibase' ),
+				$file_name
+			),
+			'success'
+		);
 	} else {
-		echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-			/* translators: %s: Uploaded Markdown file name. */
-			esc_html__( 'Uploaded "%s" — your knowledge base is ready!', 'infinibase' ),
-			esc_html( $file_name )
-		) . '</p></div>';
+		infinibase_add_admin_notice(
+			sprintf(
+				/* translators: %s: Uploaded Markdown file name. */
+				__( 'Uploaded "%s" — your knowledge base is ready!', 'infinibase' ),
+				$file_name
+			),
+			'success'
+		);
 	}
 }
 
@@ -474,12 +480,14 @@ function infinibase_handle_delete_file() {
 	$deleted    = $wpdb->delete( $table_name, array( 'file_name' => $file_to_delete ), array( '%s' ) );
 
 	if ( false !== $deleted ) {
-		echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-			/* translators: 1: Deleted Markdown file name, 2: Number of chunks removed. */
-			esc_html__( 'Deleted "%1$s" (%2$d chunks removed) from the knowledge base.', 'infinibase' ),
-			esc_html( $file_to_delete ),
-			absint( $deleted )
-		) . '</p></div>';
+		infinibase_add_admin_notice(
+			sprintf(
+				/* translators: %s: Deleted Markdown file name. */
+				__( 'Deleted "%s" from your knowledge base.', 'infinibase' ),
+				$file_to_delete
+			),
+			'success'
+		);
 	}
 }
 
@@ -516,10 +524,10 @@ function infinibase_handle_static_faqs_actions() {
 		$result       = infinibase_generate_faqs_from_doc( $selected_doc );
 
 		if ( is_wp_error( $result ) ) {
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result->get_error_message() ) . '</p></div>';
+			infinibase_add_admin_notice( $result->get_error_message(), 'error' );
 		} else {
 			update_option( 'infinibase_static_faqs', $result );
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Successfully generated and saved 4 FAQs using AI! You can review or edit them in the cards below.', 'infinibase' ) . '</p></div>';
+			infinibase_add_admin_notice( __( 'Generated and saved 4 starter FAQs. You can review or edit them below.', 'infinibase' ), 'success' );
 		}
 		return;
 	}
@@ -532,7 +540,7 @@ function infinibase_handle_static_faqs_actions() {
 			array( 'question' => '', 'answer' => '' ),
 		);
 		update_option( 'infinibase_static_faqs', $empty_cards );
-		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'All 4 predefined FAQ cards have been cleared.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'All 4 predefined FAQ cards have been cleared.', 'infinibase' ), 'success' );
 		return;
 	}
 
@@ -559,11 +567,14 @@ function infinibase_handle_static_faqs_actions() {
 		}
 
 		update_option( 'infinibase_static_faqs', $updated_cards );
-		echo '<div class="notice notice-success is-dismissible"><p>' . sprintf(
-			/* translators: %d: FAQ card number (1-4). */
-			esc_html__( 'FAQ Card #%d cleared and saved.', 'infinibase' ),
-			absint( $card_idx + 1 )
-		) . '</p></div>';
+		infinibase_add_admin_notice(
+			sprintf(
+				/* translators: %d: FAQ card number (1-4). */
+				__( 'FAQ Card #%d cleared and saved.', 'infinibase' ),
+				absint( $card_idx + 1 )
+			),
+			'success'
+		);
 		return;
 	}
 
@@ -577,7 +588,7 @@ function infinibase_handle_static_faqs_actions() {
 		}
 
 		update_option( 'infinibase_static_faqs', $saved_cards );
-		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Shortcode heading, subtitle, and 4 FAQ cards saved.', 'infinibase' ) . '</p></div>';
+		infinibase_add_admin_notice( __( 'Heading, subtitle, and FAQ cards saved.', 'infinibase' ), 'success' );
 	}
 }
 
@@ -674,6 +685,7 @@ function infinibase_ingestion_page_html() {
 		</section>
 
 		<div class="ifaq-container">
+			<?php infinibase_render_admin_notices(); ?>
 			<?php infinibase_render_review_banner(); ?>
 
 			<div class="ifaq-kb-layout">
@@ -821,7 +833,7 @@ function infinibase_ingestion_page_html() {
 												<?php endforeach; ?>
 											<?php endif; ?>
 										</select>
-										<button type="submit" name="infinibase_ai_generate_faqs_submit" value="1" class="ifaq-btn ifaq-btn-tonal" <?php disabled( empty( $files ) || ! $ai_connected ); ?>>
+										<button type="submit" name="infinibase_ai_generate_faqs_submit" value="1" class="ifaq-btn ifaq-btn-primary" <?php disabled( empty( $files ) || ! $ai_connected ); ?>>
 											<?php esc_html_e( 'Generate', 'infinibase' ); ?>
 										</button>
 									</div>

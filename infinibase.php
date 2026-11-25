@@ -736,6 +736,34 @@ function infinibase_should_show_review_banner() {
 	return $doc_count > 0;
 }
 
+function infinibase_add_admin_notice( $message, $type = 'success' ) {
+	global $infinibase_admin_notices;
+	if ( ! is_array( $infinibase_admin_notices ) ) {
+		$infinibase_admin_notices = array();
+	}
+	$infinibase_admin_notices[] = array(
+		'message' => (string) $message,
+		'type'    => ( 'error' === $type ) ? 'error' : 'success',
+	);
+}
+
+function infinibase_render_admin_notices() {
+	global $infinibase_admin_notices;
+	if ( empty( $infinibase_admin_notices ) || ! is_array( $infinibase_admin_notices ) ) {
+		return;
+	}
+	foreach ( $infinibase_admin_notices as $notice ) :
+		$cls = ( 'error' === $notice['type'] ) ? 'is-error' : 'is-success';
+		?>
+		<div class="ifaq-alert-banner <?php echo esc_attr( $cls ); ?>" role="status">
+			<span class="ifaq-alert-text"><?php echo esc_html( $notice['message'] ); ?></span>
+			<button type="button" class="ifaq-alert-close" aria-label="<?php esc_attr_e( 'Dismiss notice', 'infinibase' ); ?>">&times;</button>
+		</div>
+		<?php
+	endforeach;
+	$infinibase_admin_notices = array();
+}
+
 function infinibase_render_admin_topbar( $active_page = 'kb' ) {
 	$kb_url       = admin_url( 'admin.php?page=infinibase-ingestion' );
 	$settings_url = admin_url( 'admin.php?page=infinibase' );

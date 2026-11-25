@@ -134,6 +134,18 @@
 		});
 	});
 
+	// Dismiss inline alert banners
+	document.addEventListener('click', function (e) {
+		var closeBtn = e.target.closest('.ifaq-alert-close');
+		if (!closeBtn) {
+			return;
+		}
+		var banner = closeBtn.closest('.ifaq-alert-banner');
+		if (banner) {
+			banner.remove();
+		}
+	});
+
 	// Confirm prompts
 	document.addEventListener('click', function (e) {
 		var trigger = e.target.closest('[data-confirm]');
