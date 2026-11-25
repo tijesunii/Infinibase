@@ -14,25 +14,25 @@ Turn your product documentation into an interactive FAQ section with built-in AI
 
 **Static FAQs only answer 4 or 5 questions. What about everything else your visitors want to know?**
 
-**InfiniBase** combines a clean, modern FAQ accordion with an interactive AI search bar right below it. Visitors can browse your top questions at a glance—or type any specific question in their own words and get an instant, accurate answer pulled directly from your product documentation.
+**InfiniBase** combines a clean, modern FAQ accordion with an interactive AI search bar right below it. Visitors can browse your top questions at a glance, or type any specific question in their own words and get an instant, accurate answer pulled directly from your product documentation.
 
-No monthly SaaS subscriptions. No complex chatbot widgets floating over your page. Just a fast, native FAQ section that blends right into your website.
+It renders as a fast, native FAQ section right inside your page layout, blending naturally into your website without floating chatbot popups getting in the way.
 
 = How It Works =
 
 1. **Connect Your Preferred AI:** Use WordPress's built-in **Settings → Connectors** or paste your own API key from OpenAI, Anthropic Claude, Google Gemini, or DeepSeek.
 2. **Upload Your Docs:** Upload your Markdown (`.md`) documentation files and link each file to the live page URL where that guide lives on your site.
-3. **Set Your Top 4 FAQs:** Write your 4 main FAQ cards manually—or let AI generate them from your uploaded docs in one click.
+3. **Set Your Top 4 FAQs:** Write your 4 main FAQ cards manually, or let AI generate them from your uploaded docs in one click.
 4. **Embed Anywhere:** Drop `[infinibase_light]` or `[infinibase_dark]` into any page, post, Gutenberg block, or Elementor section.
 
 = Why Site Owners Choose InfiniBase =
 
-* **Answers Grounded in Your Docs (No Made-Up Replies):** InfiniBase only answers using the documentation you upload. It never guesses or invents features you don't have.
+* **Answers Grounded in Your Docs:** InfiniBase only answers using the documentation you upload. It never guesses or invents features you do not have.
 * **Automatic "Read More" Links:** Every AI answer includes a direct link to the exact section of your documentation page so visitors can read further.
-* **Smart Support Fallback:** If a visitor asks something that isn't covered in your docs, InfiniBase politely lets them know and gives them a direct button to your Contact Support page.
-* **1-Click FAQ Generator:** Don't want to write your initial FAQ cards from scratch? Select any uploaded document and generate 4 ready-to-use FAQs in seconds.
+* **Smart Support Fallback:** If a visitor asks something that is not covered in your docs, InfiniBase politely lets them know and gives them a direct button to your Contact Support page.
+* **1-Click FAQ Generator:** Select any uploaded document and generate 4 ready-to-use FAQs in seconds, then edit them anytime.
 * **Light & Dark Themes Built In:** Includes ready-to-use Light (`[infinibase_light]`) and Dark (`[infinibase_dark]`) modes designed to look great on any WordPress theme or page builder.
-* **No Subscriptions — Bring Your Own Key:** Pay only pennies per thousand questions directly to your chosen AI provider instead of $49+/month for a third-party chatbot tool.
+* **Bring Your Own Key (BYOK):** Connect directly to OpenAI, Anthropic Claude, Google Gemini, DeepSeek, or WordPress Core AI Connectors using your own provider account.
 
 = External Services & Privacy Disclosure =
 
@@ -63,7 +63,7 @@ Open-source development repository: https://github.com/tijesunii/Infinibase
 You can connect OpenAI, Anthropic Claude, Google Gemini, or DeepSeek using your own API key, or use WordPress's built-in **Settings → Connectors** screen.
 
 = Will the AI make up answers about my product? =
-No. InfiniBase strictly restricts answers to the documentation you have uploaded. If a visitor asks a question that isn't covered in your docs, it will not guess—instead, it shows a friendly fallback message with a button to your Contact Support page.
+No. InfiniBase strictly restricts answers to the documentation you have uploaded. If a visitor asks a question that is not covered in your docs, it will not guess. Instead, it shows a friendly fallback message with a button to your Contact Support page.
 
 = Can I use this with Elementor, Gutenberg, or other page builders? =
 Yes! InfiniBase works anywhere shortcodes are supported, including the WordPress Block Editor (Gutenberg), Elementor, Bricks, Divi, and classic themes.
@@ -73,13 +73,13 @@ Inside **InfiniBase → Knowledge Base**, you can select any uploaded document a
 
 == Screenshots ==
 
-1. Light Mode (`[infinibase_light]`) — Clean two-column FAQ accordion with instant AI search and deep-link documentation citations.
-2. Dark Mode (`[infinibase_dark]`) — Built-in dark theme ready for modern WordPress themes, Gutenberg, and Elementor.
-3. Knowledge Base — Documents — Upload Markdown documentation, track live Ready / Optimizing status, and copy Light or Dark embed shortcodes in one click.
-4. Knowledge Base — FAQ Cards & Display — Customize your section heading and subtitle, generate 4 starter FAQs with AI, and manage predefined FAQ cards.
-5. Settings — AI Provider — Choose WordPress Core AI Connectors or Bring Your Own Key (OpenAI, Anthropic, Google Gemini, DeepSeek) with a 1-click Test Connection check.
-6. Settings — Behavior & Safety — Pick Brief or Standard answer styles, configure your Contact Support fallback URL, and control data retention on uninstall.
-7. Settings — Support & Diagnostics — Copy a safe, key-free system snapshot in one click when requesting help on the WordPress.org support forum.
+1. Light Mode (`[infinibase_light]`): Clean two-column FAQ accordion with instant AI search and deep-link documentation citations.
+2. Dark Mode (`[infinibase_dark]`): Built-in dark theme ready for modern WordPress themes, Gutenberg, and Elementor.
+3. Knowledge Base (Documents): Upload Markdown documentation, track live Ready / Optimizing status, and copy Light or Dark embed shortcodes in one click.
+4. Knowledge Base (FAQ Cards & Display): Customize your section heading and subtitle, generate 4 starter FAQs with AI, and manage predefined FAQ cards.
+5. Settings (AI Provider): Choose WordPress Core AI Connectors or Bring Your Own Key (OpenAI, Anthropic, Google Gemini, DeepSeek) with a 1-click Test Connection check.
+6. Settings (Behavior & Safety): Pick Brief or Standard answer styles, configure your Contact Support fallback URL, and control data retention on uninstall.
+7. Settings (Support & Diagnostics): Copy a safe, key-free system snapshot in one click when requesting help on the WordPress.org support forum.
 
 == Changelog ==
 
