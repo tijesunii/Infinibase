@@ -630,270 +630,304 @@ function infinibase_ingestion_page_html() {
 
 	$ai_connected     = infinibase_is_ai_connected();
 	$processing_files = infinibase_get_processing_file_names();
+	$active_kb_tab    = wp_verify_nonce( $static_nonce, 'infinibase_save_static_faqs' ) ? 'panel-faqs' : 'panel-docs';
+
+	$total_docs     = is_array( $files ) ? count( $files ) : 0;
+	$total_sections = 0;
+	if ( ! empty( $files ) ) {
+		foreach ( $files as $file_item ) {
+			$total_sections += (int) $file_item->chunks;
+		}
+	}
+	$filled_faqs = 0;
+	foreach ( $static_faqs as $faq_item ) {
+		if ( '' !== trim( (string) $faq_item['question'] ) || '' !== trim( (string) $faq_item['answer'] ) ) {
+			$filled_faqs++;
+		}
+	}
 	?>
-	<div class="wrap">
-		<h1><?php esc_html_e( 'Manage Knowledge Base', 'infinibase' ); ?></h1>
-		<?php infinibase_render_review_banner(); ?>
+	<div class="ifaq-app-wrap">
+		<?php infinibase_render_admin_topbar( 'kb' ); ?>
 
-		<div class="card ifaq-admin-shortcodes-card">
-			<div class="ifaq-admin-shortcodes-row">
+		<section class="ifaq-page-hero">
+			<div class="ifaq-page-hero-inner">
 				<div>
-					<h2 class="ifaq-admin-shortcodes-title"><?php esc_html_e( 'Available Shortcodes', 'infinibase' ); ?></h2>
-					<p class="description ifaq-admin-shortcodes-desc"><?php esc_html_e( 'Click any shortcode below to copy it to your clipboard, then paste it into Gutenberg or Elementor.', 'infinibase' ); ?></p>
+					<h1 class="ifaq-hero-heading"><?php esc_html_e( 'Knowledge Base', 'infinibase' ); ?></h1>
+					<p class="ifaq-hero-desc"><?php esc_html_e( 'Upload Markdown docs and curate starter FAQ cards for your AI assistant.', 'infinibase' ); ?></p>
 				</div>
-				<div class="ifaq-admin-shortcodes-actions">
-					<button type="button" class="button ifaq-copy-shortcode-btn" data-shortcode="[infinibase_light]">
-						<span><?php esc_html_e( 'Light Mode:', 'infinibase' ); ?></span>
-						<code>[infinibase_light]</code>
-						<span class="ifaq-copy-status"><?php esc_html_e( 'Copy', 'infinibase' ); ?></span>
-					</button>
-
-					<button type="button" class="button ifaq-copy-shortcode-btn" data-shortcode="[infinibase_dark]">
-						<span><?php esc_html_e( 'Dark Mode:', 'infinibase' ); ?></span>
-						<code>[infinibase_dark]</code>
-						<span class="ifaq-copy-status"><?php esc_html_e( 'Copy', 'infinibase' ); ?></span>
-					</button>
-				</div>
-			</div>
-		</div>
-
-		<div class="ifaq-admin-grid-top">
-			<div class="card ifaq-admin-card">
-				<h2><?php esc_html_e( 'Upload Documentation', 'infinibase' ); ?></h2>
-				<p><?php esc_html_e( 'Upload your .md documentation files and InfiniBase will automatically prepare them for instant AI answers.', 'infinibase' ); ?></p>
-
-				<?php if ( ! $ai_connected ) : ?>
-					<div class="notice notice-warning inline">
-						<p>
-							<?php esc_html_e( 'AI Provider not connected. Please connect your AI Provider in Settings before uploading documentation.', 'infinibase' ); ?>
-							<a href="<?php echo esc_url( admin_url( 'admin.php?page=infinibase' ) ); ?>">
-								<?php esc_html_e( 'Go to InfiniBase Settings →', 'infinibase' ); ?>
-							</a>
-						</p>
-					</div>
-				<?php endif; ?>
-
-				<form method="post" enctype="multipart/form-data" action="">
-					<?php wp_nonce_field( 'infinibase_upload_file', 'infinibase_upload_nonce' ); ?>
-
-					<table class="form-table ifaq-upload-table">
-						<tr>
-							<th scope="row"><label for="infinibase_base_page_url"><?php esc_html_e( 'Base Page URL', 'infinibase' ); ?></label></th>
-							<td>
-								<input type="url" name="infinibase_base_page_url" id="infinibase_base_page_url" class="large-text" placeholder="https://example.com/pricing" value="<?php echo esc_attr( $retained_url ); ?>" <?php disabled( ! $ai_connected ); ?> required />
-								<p class="description"><?php esc_html_e( 'The live URL where this document lives. Used to generate "Read more" links.', 'infinibase' ); ?></p>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row"><label for="infinibase_md_file"><?php esc_html_e( 'Markdown File', 'infinibase' ); ?></label></th>
-							<td>
-								<input type="file" name="infinibase_md_file" id="infinibase_md_file" accept=".md" <?php disabled( ! $ai_connected ); ?> required />
-							</td>
-						</tr>
-					</table>
-
+				<span class="ifaq-hero-meta-mono">
 					<?php
-					submit_button(
-						esc_html__( 'Upload & Process', 'infinibase' ),
-						'primary',
-						'infinibase_upload_submit',
-						false,
-						$ai_connected ? array() : array( 'disabled' => 'disabled' )
+					echo esc_html(
+						sprintf(
+							/* translators: %d: Number of uploaded documents. */
+							_n( '%d document', '%d documents', $total_docs, 'infinibase' ),
+							$total_docs
+						) . ' · ' . sprintf(
+							/* translators: %d: Number of searchable sections. */
+							_n( '%d section', '%d sections', $total_sections, 'infinibase' ),
+							$total_sections
+						)
 					);
 					?>
-				</form>
+				</span>
 			</div>
+		</section>
 
-			<div class="card ifaq-admin-card">
-				<h2><?php esc_html_e( 'Uploaded Documents', 'infinibase' ); ?></h2>
-				<p><?php esc_html_e( 'Documents currently live in your knowledge base.', 'infinibase' ); ?></p>
-				<?php if ( ! empty( $files ) ) : ?>
-					<div class="ifaq-doc-list">
-						<?php
-						foreach ( $files as $file ) :
-							/* translators: %s: Markdown file name to delete. */
-							$delete_confirm_msg = sprintf( __( 'Delete "%s" from your knowledge base?', 'infinibase' ), $file->file_name );
-							$is_processing      = in_array( $file->file_name, $processing_files, true );
-							$formatted_date     = mysql2date( get_option( 'date_format' ), $file->last_updated );
-							?>
-							<div class="ifaq-doc-item">
-								<div class="ifaq-doc-item-top">
-									<div class="ifaq-doc-title-wrap">
-										<strong class="ifaq-doc-filename"><?php echo esc_html( $file->file_name ); ?></strong>
-										<span class="ifaq-status-badge <?php echo $is_processing ? 'is-processing' : 'is-ready'; ?>" data-file-status="<?php echo esc_attr( $file->file_name ); ?>">
-											<span class="ifaq-status-dot" aria-hidden="true"></span>
-											<span class="ifaq-status-label"><?php echo $is_processing ? esc_html__( 'Processing...', 'infinibase' ) : esc_html__( 'Ready', 'infinibase' ); ?></span>
+		<div class="ifaq-container">
+			<?php infinibase_render_review_banner(); ?>
+
+			<div class="ifaq-kb-layout">
+				<div>
+					<div class="ifaq-subtabs" data-group="kb">
+						<button type="button" class="ifaq-subtab<?php echo ( 'panel-docs' === $active_kb_tab ) ? ' is-active' : ''; ?>" data-tab="panel-docs">
+							<?php esc_html_e( 'Documents', 'infinibase' ); ?>
+							<span class="ifaq-subtab-badge"><?php echo esc_html( $total_docs ); ?></span>
+						</button>
+						<button type="button" class="ifaq-subtab<?php echo ( 'panel-faqs' === $active_kb_tab ) ? ' is-active' : ''; ?>" data-tab="panel-faqs">
+							<?php esc_html_e( 'FAQ Cards & Display', 'infinibase' ); ?>
+							<span class="ifaq-subtab-badge"><?php echo esc_html( $filled_faqs ); ?></span>
+						</button>
+					</div>
+
+					<!-- Sub-tab 1: Documents -->
+					<div class="ifaq-tab-panel<?php echo ( 'panel-docs' === $active_kb_tab ) ? ' is-active' : ''; ?>" id="panel-docs">
+						<?php if ( ! $ai_connected ) : ?>
+							<div class="ifaq-inline-alert is-warning">
+								<p>
+									<?php esc_html_e( 'AI Provider not connected. Please connect your AI Provider in Settings before uploading documentation.', 'infinibase' ); ?>
+									<a href="<?php echo esc_url( admin_url( 'admin.php?page=infinibase' ) ); ?>">
+										<?php esc_html_e( 'Go to Settings →', 'infinibase' ); ?>
+									</a>
+								</p>
+							</div>
+						<?php endif; ?>
+
+						<form method="post" enctype="multipart/form-data" action="" class="ifaq-upload-surface">
+							<?php wp_nonce_field( 'infinibase_upload_file', 'infinibase_upload_nonce' ); ?>
+							<div class="ifaq-upload-grid">
+								<div class="ifaq-field">
+									<label for="infinibase_base_page_url"><?php esc_html_e( 'Base Page URL', 'infinibase' ); ?></label>
+									<input type="url" name="infinibase_base_page_url" id="infinibase_base_page_url" class="ifaq-input-tonal" placeholder="https://example.com/docs" value="<?php echo esc_attr( $retained_url ); ?>" <?php disabled( ! $ai_connected ); ?> required />
+								</div>
+								<div class="ifaq-field">
+									<label for="infinibase_md_file"><?php esc_html_e( 'Documentation File', 'infinibase' ); ?></label>
+									<label class="ifaq-drop-trigger<?php echo ! $ai_connected ? ' is-disabled' : ''; ?>">
+										<span class="ifaq-drop-trigger-left">
+											<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+											<span class="ifaq-drop-trigger-name" id="infinibase-file-label"><?php esc_html_e( 'Choose Markdown file...', 'infinibase' ); ?></span>
 										</span>
-									</div>
-									<form method="post" action="" class="ifaq-inline-form">
-										<?php wp_nonce_field( 'infinibase_delete_indexed_file', 'infinibase_delete_file_nonce' ); ?>
-										<input type="hidden" name="infinibase_delete_file_name" value="<?php echo esc_attr( $file->file_name ); ?>" />
-										<button type="submit" name="infinibase_delete_file_submit" value="1" class="button button-small button-link-delete ifaq-delete-btn" data-confirm="<?php echo esc_attr( $delete_confirm_msg ); ?>">
-											<?php esc_html_e( 'Delete', 'infinibase' ); ?>
-										</button>
-									</form>
-								</div>
-								<div class="ifaq-doc-meta">
-									<a href="<?php echo esc_url( $file->page_slug ); ?>" target="_blank" rel="noopener noreferrer" class="ifaq-doc-url"><?php echo esc_html( $file->page_slug ); ?></a>
-									<span class="ifaq-doc-sep" aria-hidden="true">&bull;</span>
-									<span>
-										<?php
-										/* translators: %d: Number of sections in the document. */
-										echo esc_html( sprintf( _n( '%d section', '%d sections', (int) $file->chunks, 'infinibase' ), (int) $file->chunks ) );
-										?>
-									</span>
-									<span class="ifaq-doc-sep" aria-hidden="true">&bull;</span>
-									<span>
-										<?php
-										/* translators: %s: Formatted last updated date. */
-										echo esc_html( sprintf( __( 'Updated %s', 'infinibase' ), $formatted_date ) );
-										?>
-									</span>
+										<span class="ifaq-drop-ext">.md</span>
+										<input type="file" name="infinibase_md_file" id="infinibase_md_file" accept=".md" class="ifaq-file-input-hidden" <?php disabled( ! $ai_connected ); ?> required />
+									</label>
 								</div>
 							</div>
-						<?php endforeach; ?>
-					</div>
-				<?php else : ?>
-					<p class="ifaq-doc-empty"><?php esc_html_e( 'No documents uploaded yet.', 'infinibase' ); ?></p>
-				<?php endif; ?>
-			</div>
-		</div>
-
-		<div class="ifaq-admin-section-divider">
-			<h2><?php esc_html_e( 'Shortcode Display & Predefined FAQs', 'infinibase' ); ?></h2>
-			<p><?php esc_html_e( 'Customize the left-column heading, subtitle, and the 4 predefined FAQ accordion cards displayed by the [infinibase_light] and [infinibase_dark] shortcodes.', 'infinibase' ); ?></p>
-
-			<form method="post" action="">
-				<?php wp_nonce_field( 'infinibase_save_static_faqs', 'infinibase_static_nonce' ); ?>
-
-				<div class="ifaq-admin-grid-config">
-					<div class="card ifaq-admin-card">
-						<h3><?php esc_html_e( '1. Shortcode Heading & Subtitle', 'infinibase' ); ?></h3>
-						<p class="ifaq-field-group">
-							<label for="infinibase_shortcode_heading" class="ifaq-field-label">
-								<?php esc_html_e( 'Section Heading (Max 9 chars)', 'infinibase' ); ?>
-							</label>
-							<input
-								type="text"
-								name="infinibase_shortcode_heading"
-								id="infinibase_shortcode_heading"
-								value="<?php echo esc_attr( $shortcode_heading ); ?>"
-								maxlength="9"
-								class="regular-text ifaq-heading-input"
-								placeholder="Questions"
-								required
-							/>
-							<span class="description ifaq-field-hint"><?php esc_html_e( 'e.g., "Questions" or "FAQs".', 'infinibase' ); ?></span>
-						</p>
-						<p class="ifaq-field-group-last">
-							<label for="infinibase_shortcode_subtitle" class="ifaq-field-label">
-								<?php esc_html_e( 'Section Subtitle', 'infinibase' ); ?>
-							</label>
-							<input
-								type="text"
-								name="infinibase_shortcode_subtitle"
-								id="infinibase_shortcode_subtitle"
-								value="<?php echo esc_attr( $shortcode_subtitle ); ?>"
-								class="large-text"
-								placeholder="The short ones are here. For anything else, ask our AI below."
-								required
-							/>
-						</p>
-					</div>
-
-					<div class="card ifaq-admin-card">
-						<h3><?php esc_html_e( '2. Auto-Generate 4 FAQs with AI', 'infinibase' ); ?></h3>
-						<p class="ifaq-ai-gen-desc"><?php esc_html_e( 'Select an uploaded document below and let your configured AI Provider automatically generate 4 questions and answers from its content.', 'infinibase' ); ?></p>
-
-						<div class="ifaq-ai-gen-controls">
-							<div>
-								<label for="infinibase_source_doc" class="ifaq-field-label"><?php esc_html_e( 'Source Document', 'infinibase' ); ?></label>
-								<select name="infinibase_source_doc" id="infinibase_source_doc" class="ifaq-full-select">
-									<option value="__all__" <?php selected( $selected_source_doc, '__all__' ); ?>><?php esc_html_e( 'All Indexed Documents', 'infinibase' ); ?></option>
-									<?php if ( ! empty( $files ) ) : ?>
-										<?php foreach ( $files as $file ) : ?>
-											<option value="<?php echo esc_attr( $file->file_name ); ?>" <?php selected( $selected_source_doc, $file->file_name ); ?>>
-												<?php echo esc_html( $file->file_name . ' (' . $file->chunks . ' chunks)' ); ?>
-											</option>
-										<?php endforeach; ?>
-									<?php endif; ?>
-								</select>
-							</div>
-
-							<div>
-								<button type="submit" name="infinibase_ai_generate_faqs_submit" value="1" class="button button-secondary" <?php disabled( empty( $files ) || ! $ai_connected ); ?>>
-									<?php esc_html_e( '✨ Generate 4 FAQs with AI', 'infinibase' ); ?>
+							<div class="ifaq-upload-footer">
+								<span class="ifaq-field-hint"><?php esc_html_e( 'Used to generate deep-link "Read more" citations for every AI answer.', 'infinibase' ); ?></span>
+								<button type="submit" name="infinibase_upload_submit" value="1" class="ifaq-btn ifaq-btn-primary" <?php disabled( ! $ai_connected ); ?>>
+									<?php esc_html_e( 'Upload & Process', 'infinibase' ); ?>
 								</button>
 							</div>
-						</div>
-						<?php if ( empty( $files ) ) : ?>
-							<p class="description ifaq-notice-text"><?php esc_html_e( 'Upload at least one .md document above to enable AI FAQ generation.', 'infinibase' ); ?></p>
+						</form>
+
+						<?php if ( ! empty( $files ) ) : ?>
+							<div class="ifaq-doc-list-clean">
+								<?php
+								foreach ( $files as $file ) :
+									/* translators: %s: Markdown file name to delete. */
+									$delete_confirm_msg = sprintf( __( 'Delete "%s" from your knowledge base?', 'infinibase' ), $file->file_name );
+									$is_processing      = in_array( $file->file_name, $processing_files, true );
+									$formatted_date     = mysql2date( get_option( 'date_format' ), $file->last_updated );
+									?>
+									<div class="ifaq-doc-row">
+										<div class="ifaq-doc-row-main">
+											<div class="ifaq-doc-row-title">
+												<span class="ifaq-doc-filename"><?php echo esc_html( $file->file_name ); ?></span>
+												<span class="ifaq-status-badge <?php echo $is_processing ? 'is-processing' : 'is-ready'; ?>" data-file-status="<?php echo esc_attr( $file->file_name ); ?>">
+													<span class="ifaq-status-label"><?php echo $is_processing ? esc_html__( 'Optimizing...', 'infinibase' ) : esc_html__( 'Ready', 'infinibase' ); ?></span>
+												</span>
+											</div>
+											<div class="ifaq-doc-meta-line">
+												<a href="<?php echo esc_url( $file->page_slug ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $file->page_slug ); ?></a>
+												<span aria-hidden="true">&middot;</span>
+												<span class="ifaq-doc-meta-mono">
+													<?php
+													/* translators: %d: Number of sections in the document. */
+													echo esc_html( sprintf( _n( '%d section', '%d sections', (int) $file->chunks, 'infinibase' ), (int) $file->chunks ) );
+													?>
+												</span>
+												<span aria-hidden="true">&middot;</span>
+												<span>
+													<?php
+													/* translators: %s: Formatted last updated date. */
+													echo esc_html( sprintf( __( 'Updated %s', 'infinibase' ), $formatted_date ) );
+													?>
+												</span>
+											</div>
+										</div>
+										<form method="post" action="" class="ifaq-inline-form">
+											<?php wp_nonce_field( 'infinibase_delete_indexed_file', 'infinibase_delete_file_nonce' ); ?>
+											<input type="hidden" name="infinibase_delete_file_name" value="<?php echo esc_attr( $file->file_name ); ?>" />
+											<button type="submit" name="infinibase_delete_file_submit" value="1" class="ifaq-btn-icon-del" title="<?php esc_attr_e( 'Delete document', 'infinibase' ); ?>" aria-label="<?php esc_attr_e( 'Delete document', 'infinibase' ); ?>" data-confirm="<?php echo esc_attr( $delete_confirm_msg ); ?>">
+												<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+											</button>
+										</form>
+									</div>
+								<?php endforeach; ?>
+							</div>
+						<?php else : ?>
+							<div class="ifaq-doc-empty"><?php esc_html_e( 'No documents uploaded yet. Upload your first Markdown (.md) file above to get started.', 'infinibase' ); ?></div>
 						<?php endif; ?>
 					</div>
-				</div>
 
-				<div class="ifaq-cards-header-bar">
-					<h3><?php esc_html_e( '3. Predefined Question & Answer Cards (4 Slots)', 'infinibase' ); ?></h3>
-					<button type="submit" name="infinibase_delete_all_cards_submit" value="1" class="button button-link-delete ifaq-delete-btn" data-confirm="<?php echo esc_attr__( 'Are you sure you want to clear all 4 predefined FAQ cards?', 'infinibase' ); ?>">
-						<?php esc_html_e( 'Delete All Predefined FAQs', 'infinibase' ); ?>
-					</button>
-				</div>
+					<!-- Sub-tab 2: FAQ Cards & Display -->
+					<div class="ifaq-tab-panel<?php echo ( 'panel-faqs' === $active_kb_tab ) ? ' is-active' : ''; ?>" id="panel-faqs">
+						<form method="post" action="" class="ifaq-faq-stack">
+							<?php wp_nonce_field( 'infinibase_save_static_faqs', 'infinibase_static_nonce' ); ?>
 
-				<div class="ifaq-admin-grid-cards">
-					<?php for ( $i = 0; $i < 4; $i++ ) : ?>
-						<div class="card ifaq-admin-card">
-							<div class="ifaq-card-item-header">
-								<h4>
-									<?php
-									echo sprintf(
-										/* translators: %d: FAQ card number (1-4). */
-										esc_html__( 'FAQ Card #%d', 'infinibase' ),
-										absint( $i + 1 )
-									);
-									?>
-								</h4>
-								<button type="submit" name="infinibase_delete_single_card" value="<?php echo esc_attr( $i ); ?>" class="button-link button-link-delete ifaq-card-delete-link">
-									<?php esc_html_e( 'Delete Card', 'infinibase' ); ?>
+							<div class="ifaq-faq-top-grid">
+								<div class="ifaq-field">
+									<label for="infinibase_shortcode_heading"><?php esc_html_e( 'Section Heading (max 9 chars)', 'infinibase' ); ?></label>
+									<input
+										type="text"
+										name="infinibase_shortcode_heading"
+										id="infinibase_shortcode_heading"
+										value="<?php echo esc_attr( $shortcode_heading ); ?>"
+										maxlength="9"
+										class="ifaq-input-tonal"
+										placeholder="Questions"
+										required
+									/>
+								</div>
+
+								<div class="ifaq-field">
+									<label for="infinibase_source_doc"><?php esc_html_e( 'Generate 4 Starter FAQs', 'infinibase' ); ?></label>
+									<div class="ifaq-action-row-inline">
+										<select name="infinibase_source_doc" id="infinibase_source_doc" class="ifaq-select-tonal">
+											<option value="__all__" <?php selected( $selected_source_doc, '__all__' ); ?>><?php esc_html_e( 'All Documents', 'infinibase' ); ?></option>
+											<?php if ( ! empty( $files ) ) : ?>
+												<?php foreach ( $files as $file ) : ?>
+													<option value="<?php echo esc_attr( $file->file_name ); ?>" <?php selected( $selected_source_doc, $file->file_name ); ?>>
+														<?php
+														echo esc_html(
+															sprintf(
+																/* translators: 1: File name, 2: Section count. */
+																__( '%1$s (%2$d sections)', 'infinibase' ),
+																$file->file_name,
+																(int) $file->chunks
+															)
+														);
+														?>
+													</option>
+												<?php endforeach; ?>
+											<?php endif; ?>
+										</select>
+										<button type="submit" name="infinibase_ai_generate_faqs_submit" value="1" class="ifaq-btn ifaq-btn-tonal" <?php disabled( empty( $files ) || ! $ai_connected ); ?>>
+											<?php esc_html_e( 'Generate', 'infinibase' ); ?>
+										</button>
+									</div>
+								</div>
+
+								<div class="ifaq-field ifaq-span-full">
+									<label for="infinibase_shortcode_subtitle"><?php esc_html_e( 'Section Subtitle', 'infinibase' ); ?></label>
+									<input
+										type="text"
+										name="infinibase_shortcode_subtitle"
+										id="infinibase_shortcode_subtitle"
+										value="<?php echo esc_attr( $shortcode_subtitle ); ?>"
+										class="ifaq-input-tonal"
+										placeholder="The short ones are here. For anything else, ask our AI below."
+										required
+									/>
+								</div>
+							</div>
+
+							<div class="ifaq-cards-toolbar">
+								<span class="ifaq-cards-toolbar-label"><?php esc_html_e( 'Predefined FAQ Cards (4 Slots)', 'infinibase' ); ?></span>
+								<button type="submit" name="infinibase_delete_all_cards_submit" value="1" class="ifaq-btn-ghost-danger" data-confirm="<?php echo esc_attr__( 'Are you sure you want to clear all 4 predefined FAQ cards?', 'infinibase' ); ?>">
+									<?php esc_html_e( 'Clear All Cards', 'infinibase' ); ?>
 								</button>
 							</div>
-							<p class="ifaq-field-group">
-								<label for="infinibase_card_q_<?php echo esc_attr( $i ); ?>" class="ifaq-field-label">
-									<?php esc_html_e( 'Question', 'infinibase' ); ?>
-								</label>
-								<input
-									type="text"
-									name="infinibase_card_q[<?php echo esc_attr( $i ); ?>]"
-									id="infinibase_card_q_<?php echo esc_attr( $i ); ?>"
-									value="<?php echo esc_attr( $static_faqs[ $i ]['question'] ); ?>"
-									class="large-text"
-									placeholder="<?php echo esc_attr__( 'e.g., What is your refund policy?', 'infinibase' ); ?>"
-								/>
-							</p>
-							<p class="ifaq-field-group-last">
-								<label for="infinibase_card_a_<?php echo esc_attr( $i ); ?>" class="ifaq-field-label">
-									<?php esc_html_e( 'Answer', 'infinibase' ); ?>
-								</label>
-								<textarea
-									name="infinibase_card_a[<?php echo esc_attr( $i ); ?>]"
-									id="infinibase_card_a_<?php echo esc_attr( $i ); ?>"
-									rows="4"
-									class="large-text"
-									placeholder="<?php echo esc_attr__( 'Enter the concise answer displayed when this FAQ is expanded...', 'infinibase' ); ?>"
-								><?php echo esc_textarea( $static_faqs[ $i ]['answer'] ); ?></textarea>
-							</p>
-						</div>
-					<?php endfor; ?>
+
+							<div class="ifaq-faq-cards-grid">
+								<?php for ( $i = 0; $i < 4; $i++ ) : ?>
+									<div class="ifaq-faq-card">
+										<div class="ifaq-faq-card-head">
+											<span class="ifaq-faq-card-idx">
+												<?php
+												echo esc_html(
+													sprintf(
+														/* translators: %d: FAQ slot number (1-4). */
+														__( 'FAQ 0%d', 'infinibase' ),
+														absint( $i + 1 )
+													)
+												);
+												?>
+											</span>
+											<button type="submit" name="infinibase_delete_single_card" value="<?php echo esc_attr( $i ); ?>" class="ifaq-faq-clear-btn">
+												<?php esc_html_e( 'Clear', 'infinibase' ); ?>
+											</button>
+										</div>
+										<input
+											type="text"
+											name="infinibase_card_q[<?php echo esc_attr( $i ); ?>]"
+											id="infinibase_card_q_<?php echo esc_attr( $i ); ?>"
+											value="<?php echo esc_attr( $static_faqs[ $i ]['question'] ); ?>"
+											class="ifaq-input-tonal"
+											placeholder="<?php echo esc_attr__( 'Question (e.g., What is your refund policy?)', 'infinibase' ); ?>"
+										/>
+										<textarea
+											name="infinibase_card_a[<?php echo esc_attr( $i ); ?>]"
+											id="infinibase_card_a_<?php echo esc_attr( $i ); ?>"
+											rows="4"
+											class="ifaq-textarea-tonal"
+											placeholder="<?php echo esc_attr__( 'Concise answer displayed when this FAQ is expanded...', 'infinibase' ); ?>"
+										><?php echo esc_textarea( $static_faqs[ $i ]['answer'] ); ?></textarea>
+									</div>
+								<?php endfor; ?>
+							</div>
+
+							<div class="ifaq-action-row">
+								<button type="submit" name="infinibase_save_static_submit" value="1" class="ifaq-btn ifaq-btn-primary">
+									<?php esc_html_e( 'Save Heading & FAQ Cards', 'infinibase' ); ?>
+								</button>
+							</div>
+						</form>
+					</div>
 				</div>
 
-				<p class="submit ifaq-submit-row">
-					<button type="submit" name="infinibase_save_static_submit" value="1" class="button button-primary button-large">
-						<?php esc_html_e( 'Save Heading & FAQ Cards', 'infinibase' ); ?>
-					</button>
-				</p>
-			</form>
-		</div>
+				<!-- Contextual Right Rail -->
+				<aside class="ifaq-rail">
+					<div class="ifaq-rail-card">
+						<div class="ifaq-rail-title"><?php esc_html_e( 'Embed Shortcodes', 'infinibase' ); ?></div>
+						<p class="ifaq-rail-desc"><?php esc_html_e( 'Click any theme card to copy and paste into Gutenberg or Elementor.', 'infinibase' ); ?></p>
 
-		<?php infinibase_render_help_bar(); ?>
+						<button type="button" class="ifaq-embed-tile ifaq-copy-shortcode-btn" data-shortcode="[infinibase_light]">
+							<div class="ifaq-mini-preview is-light" aria-hidden="true">
+								<div class="ifaq-mini-bar"></div>
+								<div class="ifaq-mini-bar-2"></div>
+							</div>
+							<div class="ifaq-embed-tile-foot">
+								<span class="ifaq-embed-code">[infinibase_light]</span>
+								<span class="ifaq-embed-copy ifaq-copy-status"><?php esc_html_e( 'Copy', 'infinibase' ); ?></span>
+							</div>
+						</button>
+
+						<button type="button" class="ifaq-embed-tile ifaq-copy-shortcode-btn" data-shortcode="[infinibase_dark]">
+							<div class="ifaq-mini-preview is-dark" aria-hidden="true">
+								<div class="ifaq-mini-bar"></div>
+								<div class="ifaq-mini-bar-2"></div>
+							</div>
+							<div class="ifaq-embed-tile-foot">
+								<span class="ifaq-embed-code">[infinibase_dark]</span>
+								<span class="ifaq-embed-copy ifaq-copy-status"><?php esc_html_e( 'Copy', 'infinibase' ); ?></span>
+							</div>
+						</button>
+					</div>
+
+					<?php infinibase_render_resources_rail(); ?>
+				</aside>
+			</div>
+		</div>
 	</div>
 	<?php
 }

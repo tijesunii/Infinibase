@@ -736,27 +736,90 @@ function infinibase_should_show_review_banner() {
 	return $doc_count > 0;
 }
 
+function infinibase_render_admin_topbar( $active_page = 'kb' ) {
+	$kb_url       = admin_url( 'admin.php?page=infinibase-ingestion' );
+	$settings_url = admin_url( 'admin.php?page=infinibase' );
+	?>
+	<header class="ifaq-top-nav">
+		<div class="ifaq-top-nav-inner">
+			<div class="ifaq-brand">
+				<div class="ifaq-brand-mark" aria-hidden="true">
+					<svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+						<rect x="3" y="5" width="18" height="4.5" rx="2.25" fill="#ffffff"/>
+						<rect x="3" y="11.5" width="13.5" height="4.5" rx="2.25" fill="#ffffff"/>
+						<path d="M19 15.5L19.8 17.7L22 18.5L19.8 19.3L19 21.5L18.2 19.3L16 18.5L18.2 17.7L19 15.5Z" fill="#ffffff"/>
+					</svg>
+				</div>
+				<span class="ifaq-brand-title">InfiniBase</span>
+				<span class="ifaq-brand-ver"><?php echo esc_html( INFINIBASE_VERSION ); ?></span>
+			</div>
+
+			<nav class="ifaq-pill-nav" aria-label="<?php esc_attr_e( 'InfiniBase navigation', 'infinibase' ); ?>">
+				<a href="<?php echo esc_url( $kb_url ); ?>" class="ifaq-pill-nav-btn<?php echo ( 'kb' === $active_page ) ? ' is-active' : ''; ?>">
+					<?php esc_html_e( 'Knowledge Base', 'infinibase' ); ?>
+				</a>
+				<a href="<?php echo esc_url( $settings_url ); ?>" class="ifaq-pill-nav-btn<?php echo ( 'settings' === $active_page ) ? ' is-active' : ''; ?>">
+					<?php esc_html_e( 'Settings', 'infinibase' ); ?>
+				</a>
+			</nav>
+
+			<div class="ifaq-top-links">
+				<a class="ifaq-top-link" href="https://www.youtube.com/@thewpbro" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Tutorials', 'infinibase' ); ?></a>
+				<a class="ifaq-top-link" href="https://wordpress.org/support/plugin/infinibase/" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Support', 'infinibase' ); ?></a>
+			</div>
+		</div>
+	</header>
+	<?php
+}
+
+function infinibase_render_resources_rail() {
+	?>
+	<div class="ifaq-rail-card">
+		<div class="ifaq-rail-title"><?php esc_html_e( 'Resources & Feedback', 'infinibase' ); ?></div>
+		<p class="ifaq-rail-desc"><?php esc_html_e( 'Watch setup walkthroughs, report bugs, or leave a review on WordPress.org.', 'infinibase' ); ?></p>
+		<div class="ifaq-rail-links">
+			<a class="ifaq-rail-link" href="https://www.youtube.com/@thewpbro" target="_blank" rel="noopener noreferrer">
+				<span><?php esc_html_e( 'Video Tutorials (@thewpbro)', 'infinibase' ); ?></span>
+				<span aria-hidden="true">&rarr;</span>
+			</a>
+			<a class="ifaq-rail-link" href="https://wordpress.org/support/plugin/infinibase/" target="_blank" rel="noopener noreferrer">
+				<span><?php esc_html_e( 'Report a Bug / Support', 'infinibase' ); ?></span>
+				<span aria-hidden="true">&rarr;</span>
+			</a>
+			<a class="ifaq-rail-link" href="https://wordpress.org/support/plugin/infinibase/reviews/#new-post" target="_blank" rel="noopener noreferrer">
+				<span><?php esc_html_e( 'Rate on WordPress.org', 'infinibase' ); ?></span>
+				<span aria-hidden="true">&rarr;</span>
+			</a>
+			<a class="ifaq-rail-link" href="https://eben.allmytools.xyz" target="_blank" rel="noopener noreferrer">
+				<span><?php esc_html_e( 'Built by THEWPBRO', 'infinibase' ); ?></span>
+				<span aria-hidden="true">&rarr;</span>
+			</a>
+		</div>
+	</div>
+	<?php
+}
+
 function infinibase_render_review_banner() {
 	if ( ! infinibase_should_show_review_banner() ) {
 		return;
 	}
 	?>
-	<div id="infinibase-review-banner" class="notice notice-info ifaq-review-banner">
-		<p>
+	<div id="infinibase-review-banner" class="ifaq-review-banner">
+		<div class="ifaq-review-banner-copy">
 			<strong><?php esc_html_e( 'Enjoying InfiniBase?', 'infinibase' ); ?></strong>
-			<?php esc_html_e( 'If it is helping your visitors find answers faster, a quick 5-star review on WordPress.org helps other site owners discover it.', 'infinibase' ); ?>
-		</p>
-		<p class="ifaq-review-actions">
-			<a href="https://wordpress.org/support/plugin/infinibase/reviews/#new-post" target="_blank" rel="noopener noreferrer" class="button button-primary ifaq-review-btn" data-review-action="dismiss">
-				<?php esc_html_e( 'Leave a 5-Star Review ★', 'infinibase' ); ?>
+			<span><?php esc_html_e( 'If it is helping your visitors find answers faster, a quick 5-star review on WordPress.org helps other site owners discover it.', 'infinibase' ); ?></span>
+		</div>
+		<div class="ifaq-review-actions">
+			<a href="https://wordpress.org/support/plugin/infinibase/reviews/#new-post" target="_blank" rel="noopener noreferrer" class="ifaq-btn ifaq-btn-primary ifaq-review-btn" data-review-action="dismiss">
+				<?php esc_html_e( 'Leave a 5-Star Review', 'infinibase' ); ?>
 			</a>
-			<button type="button" class="button ifaq-review-btn" data-review-action="snooze">
+			<button type="button" class="ifaq-btn ifaq-btn-tonal ifaq-review-btn" data-review-action="snooze">
 				<?php esc_html_e( 'Maybe Later', 'infinibase' ); ?>
 			</button>
-			<button type="button" class="button-link ifaq-review-btn" data-review-action="dismiss">
-				<?php esc_html_e( 'Already did / Don’t show again', 'infinibase' ); ?>
+			<button type="button" class="ifaq-btn-ghost ifaq-review-btn" data-review-action="dismiss">
+				<?php esc_html_e( 'Don’t show again', 'infinibase' ); ?>
 			</button>
-		</p>
+		</div>
 	</div>
 	<?php
 }

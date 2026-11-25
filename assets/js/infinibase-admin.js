@@ -29,6 +29,29 @@
 		});
 	}
 
+	// Scoped underline sub-tabs (KB & Settings)
+	document.querySelectorAll('.ifaq-subtabs').forEach(function (group) {
+		var tabs = group.querySelectorAll('.ifaq-subtab');
+		tabs.forEach(function (tab) {
+			tab.addEventListener('click', function () {
+				var panelId = tab.getAttribute('data-tab');
+				tabs.forEach(function (t) {
+					t.classList.remove('is-active');
+					var p = document.getElementById(t.getAttribute('data-tab'));
+					if (p) {
+						p.classList.remove('is-active');
+					}
+				});
+				tab.classList.add('is-active');
+				var activePanel = document.getElementById(panelId);
+				if (activePanel) {
+					activePanel.classList.add('is-active');
+				}
+			});
+		});
+	});
+
+	// Shortcode copy tiles
 	document.querySelectorAll('.ifaq-copy-shortcode-btn').forEach(function (btn) {
 		btn.addEventListener('click', function () {
 			var code = btn.getAttribute('data-shortcode');
@@ -49,22 +72,69 @@
 		});
 	});
 
-	var providerSelect = document.getElementById('infinibase_ai_provider');
-	var wpCoreNotice = document.getElementById('infinibase-wp-core-notice');
-	var apiKeyRow = document.getElementById('infinibase-api-key-row');
-
-	if (providerSelect && wpCoreNotice && apiKeyRow) {
-		providerSelect.addEventListener('change', function () {
-			if (providerSelect.value === 'wp_core') {
-				wpCoreNotice.classList.add('is-visible');
-				apiKeyRow.classList.add('ifaq-row-hidden');
+	// File input display label
+	var mdFileInput = document.getElementById('infinibase_md_file');
+	var mdFileLabel = document.getElementById('infinibase-file-label');
+	if (mdFileInput && mdFileLabel) {
+		mdFileInput.addEventListener('change', function () {
+			if (mdFileInput.files && mdFileInput.files.length > 0) {
+				mdFileLabel.textContent = mdFileInput.files[0].name;
 			} else {
-				wpCoreNotice.classList.remove('is-visible');
-				apiKeyRow.classList.remove('ifaq-row-hidden');
+				mdFileLabel.textContent = 'Choose Markdown file...';
 			}
 		});
 	}
 
+	// Visual AI Provider tile selector
+	var providerHidden = document.getElementById('infinibase_ai_provider');
+	var wpCoreNotice = document.getElementById('infinibase-wp-core-notice');
+	var apiKeyRow = document.getElementById('infinibase-api-key-row');
+
+	document.querySelectorAll('#infinibase-provider-grid .ifaq-provider-tile').forEach(function (tile) {
+		tile.addEventListener('click', function () {
+			var selectedProvider = tile.getAttribute('data-provider');
+			if (!selectedProvider) {
+				return;
+			}
+			document.querySelectorAll('#infinibase-provider-grid .ifaq-provider-tile').forEach(function (t) {
+				t.classList.remove('is-selected');
+			});
+			tile.classList.add('is-selected');
+
+			if (providerHidden) {
+				providerHidden.value = selectedProvider;
+			}
+			if (wpCoreNotice && apiKeyRow) {
+				if (selectedProvider === 'wp_core') {
+					wpCoreNotice.classList.add('is-visible');
+					apiKeyRow.classList.add('ifaq-row-hidden');
+				} else {
+					wpCoreNotice.classList.remove('is-visible');
+					apiKeyRow.classList.remove('ifaq-row-hidden');
+				}
+			}
+		});
+	});
+
+	// Visual Response Style (Brief / Standard) cards
+	var answerLengthHidden = document.getElementById('infinibase_answer_length');
+	document.querySelectorAll('#infinibase-choice-grid .ifaq-choice-card').forEach(function (card) {
+		card.addEventListener('click', function () {
+			var val = card.getAttribute('data-answer-length');
+			if (!val) {
+				return;
+			}
+			document.querySelectorAll('#infinibase-choice-grid .ifaq-choice-card').forEach(function (c) {
+				c.classList.remove('is-selected');
+			});
+			card.classList.add('is-selected');
+			if (answerLengthHidden) {
+				answerLengthHidden.value = val;
+			}
+		});
+	});
+
+	// Confirm prompts
 	document.addEventListener('click', function (e) {
 		var trigger = e.target.closest('[data-confirm]');
 		if (!trigger) {
@@ -76,6 +146,7 @@
 		}
 	});
 
+	// Background optimization live status polling
 	function pollProcessingStatus() {
 		var processingBadges = document.querySelectorAll('.ifaq-status-badge.is-processing');
 		if (!processingBadges.length || typeof window.infinibaseAdminData === 'undefined') {
@@ -125,12 +196,12 @@
 		setTimeout(pollProcessingStatus, 2500);
 	}
 
+	// 1-Click Test Connection
 	var testConnBtn = document.getElementById('infinibase-test-connection-btn');
 	if (testConnBtn && typeof window.infinibaseAdminData !== 'undefined') {
 		testConnBtn.addEventListener('click', function () {
-			var providerEl = document.getElementById('infinibase_ai_provider');
+			var providerVal = providerHidden ? providerHidden.value : '';
 			var keyEl = document.getElementById('infinibase_api_key');
-			var providerVal = providerEl ? providerEl.value : '';
 			var statusEl =
 				providerVal === 'wp_core'
 					? document.getElementById('infinibase-wp-core-test-status')
@@ -195,6 +266,7 @@
 		});
 	}
 
+	// Condition-triggered review banner dismiss/snooze
 	document.querySelectorAll('.ifaq-review-btn').forEach(function (btn) {
 		btn.addEventListener('click', function () {
 			var action = btn.getAttribute('data-review-action') || 'dismiss';
@@ -219,6 +291,7 @@
 		});
 	});
 
+	// 1-Click Copy Debug Info
 	document.querySelectorAll('.ifaq-copy-debug-btn').forEach(function (btn) {
 		btn.addEventListener('click', function () {
 			var info = btn.getAttribute('data-debug-info');

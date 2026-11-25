@@ -100,3 +100,8 @@ Inside **InfiniBase → Knowledge Base**, you can select any uploaded document a
 
 = 1.0.2 =
 Smarter AI question matching, 10x faster large-document uploads, a 1-click Test Connection tool, and a cleaner mobile-friendly Knowledge Base dashboard.
+
+== Credits ==
+
+* Bundled admin fonts: [Plus Jakarta Sans](https://github.com/tokotype/PlusJakartaSans) and [JetBrains Mono](https://www.jetbrains.com/lp/mono/), both licensed under the [SIL Open Font License 1.1](https://openfontlicense.org/).
+* Bundled Markdown parser: [Parsedown](https://parsedown.org/), licensed under the MIT License.
