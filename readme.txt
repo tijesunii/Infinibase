@@ -4,7 +4,7 @@ Tags: faq, ai, knowledge-base, accordion, customer-support
 Requires at least: 6.2
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -81,5 +81,18 @@ Inside **InfiniBase → Knowledge Base**, you can select any uploaded document a
 
 == Changelog ==
 
+= 1.0.1 =
+* Fixed: Markdown horizontal rules (`---`) no longer truncate documents during upload, and removed stray XML processing instruction chunks.
+* Improved: Markdown chunker now preserves hierarchical section heading breadcrumbs inside every chunk, formats lists and tables cleanly, splits oversized heading-less sections automatically, and generates clean ASCII anchor IDs.
+* Improved: Upgraded retrieval engine to a hybrid multi-chunk pipeline (weighted composite FULLTEXT across keywords and body text + tokenized fallback) returning the top 3 matching sections with exact `[SOURCE:N]` deep-link citations.
+* Improved: Added automatic `dbDelta()` schema upgrade on `plugins_loaded` so existing installs seamlessly gain the composite FULLTEXT index.
+* Security: Moved Google Gemini API key authentication from URL query parameters to the `x-goog-api-key` HTTP header and added a configurable 24-hour site-wide AI budget cap (`infinibase_daily_rate_limit`).
+* Fixed: Multi-instance shortcodes on the same page now generate unique honeypot DOM IDs via `wp_unique_id()`.
+
 = 1.0.0 =
 * Initial release of InfiniBase: AI FAQ & Knowledge Base.
+
+== Upgrade Notice ==
+
+= 1.0.1 =
+Major Markdown parser and AI search accuracy upgrade. After updating, re-upload any existing `.md` files that contained `---` dividers to rebuild their full section chunks.

@@ -110,6 +110,7 @@ function infinibase_render_shortcode( $atts = array() ) {
 	$theme_mode  = ( 'dark' === strtolower( $atts['theme'] ) ) ? 'dark' : 'light';
 	$theme_class = 'infinite-faqs-theme-' . $theme_mode;
 	$config_json = wp_json_encode( infinibase_get_frontend_config() );
+	$hp_field_id = wp_unique_id( 'ifaq_email_check_' );
 
 	$static_faqs = get_option( 'infinibase_static_faqs', array() );
 	if ( ! is_array( $static_faqs ) ) {
@@ -157,8 +158,8 @@ function infinibase_render_shortcode( $atts = array() ) {
 				<div class="infinite-faqs-ask-section">
 					<form class="infinite-faqs-ask-form" novalidate>
 						<div class="infinite-faqs-hp-wrap" aria-hidden="true">
-							<label for="ifaq_email_check_<?php echo esc_attr( $theme_mode ); ?>">Do not fill this field</label>
-							<input type="text" name="_ifaq_email_check" id="ifaq_email_check_<?php echo esc_attr( $theme_mode ); ?>" class="infinite-faqs-honeypot" value="" tabindex="-1" autocomplete="off" />
+							<label for="<?php echo esc_attr( $hp_field_id ); ?>">Do not fill this field</label>
+							<input type="text" name="_ifaq_email_check" id="<?php echo esc_attr( $hp_field_id ); ?>" class="infinite-faqs-honeypot" value="" tabindex="-1" autocomplete="off" />
 						</div>
 
 						<div class="infinite-faqs-input-wrapper">

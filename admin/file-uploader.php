@@ -41,6 +41,167 @@ function infinibase_admin_enqueue_scripts( $hook_suffix ) {
 }
 add_action( 'admin_enqueue_scripts', 'infinibase_admin_enqueue_scripts' );
 
+function infinibase_make_anchor_id( $heading ) {
+	$text = trim( (string) $heading );
+	if ( function_exists( 'remove_accents' ) ) {
+		$text = remove_accents( $text );
+	}
+	$text = preg_replace( '/[\x{2010}-\x{2015}\x{2212}]/u', '-', $text );
+	$text = preg_replace( '/[^a-zA-Z0-9\s\-]/', ' ', $text );
+	$text = strtolower( trim( preg_replace( '/[\s\-]+/', '-', $text ), '-' ) );
+
+	if ( '' === $text ) {
+		return 'section';
+	}
+
+	return substr( $text, 0, 120 );
+}
+
+function infinibase_extract_node_text( DOMNode $node ) {
+	$tag = strtolower( $node->nodeName );
+
+	if ( 'ul' === $tag || 'ol' === $tag ) {
+		$lines = array();
+		foreach ( $node->childNodes as $child ) {
+			if ( XML_ELEMENT_NODE === $child->nodeType && 'li' === strtolower( $child->nodeName ) ) {
+				$item_text = trim( preg_replace( '/\s+/u', ' ', $child->textContent ) );
+				if ( '' !== $item_text ) {
+					$lines[] = '- ' . $item_text;
+				}
+			}
+		}
+		return implode( "\n", $lines );
+	}
+
+	if ( 'table' === $tag ) {
+		$rows = array();
+		$tr_nodes = $node->getElementsByTagName( 'tr' );
+		foreach ( $tr_nodes as $tr ) {
+			$cells = array();
+			foreach ( $tr->childNodes as $cell ) {
+				if ( XML_ELEMENT_NODE === $cell->nodeType && in_array( strtolower( $cell->nodeName ), array( 'th', 'td' ), true ) ) {
+					$cell_text = trim( preg_replace( '/\s+/u', ' ', $cell->textContent ) );
+					if ( '' !== $cell_text ) {
+						$cells[] = $cell_text;
+					}
+				}
+			}
+			if ( ! empty( $cells ) ) {
+				$rows[] = implode( ' | ', $cells );
+			}
+		}
+		return implode( "\n", $rows );
+	}
+
+	return trim( preg_replace( '/[ \t]+/u', ' ', $node->textContent ) );
+}
+
+function infinibase_parse_markdown_chunks( $markdown_content, $max_chunk_chars = 1500 ) {
+	if ( ! class_exists( '\InfiniBase\Vendor\Parsedown' ) ) {
+		require_once INFINIBASE_PLUGIN_DIR . 'includes/class-infinibase-parsedown.php';
+	}
+
+	$markdown_content = preg_replace( '/^\xEF\xBB\xBF/', '', (string) $markdown_content );
+	$markdown_content = str_replace( array( "\r\n", "\r" ), "\n", $markdown_content );
+
+	$parsedown    = new \InfiniBase\Vendor\Parsedown();
+	$html_content = $parsedown->text( $markdown_content );
+
+	$wrapped_html = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><div id="infinibase-root">' . $html_content . '</div></body></html>';
+
+	$dom = new DOMDocument();
+	libxml_use_internal_errors( true );
+	@$dom->loadHTML( $wrapped_html );
+	libxml_clear_errors();
+
+	$root = $dom->getElementById( 'infinibase-root' );
+	if ( ! $root ) {
+		return array();
+	}
+
+	$chunks             = array();
+	$heading_stack      = array();
+	$current_anchor     = 'introduction';
+	$current_breadcrumb = '';
+	$current_blocks     = array();
+	$current_len        = 0;
+
+	$flush_chunk = static function () use ( &$chunks, &$current_anchor, &$current_breadcrumb, &$current_blocks, &$current_len ) {
+		$body = trim( implode( "\n\n", $current_blocks ) );
+		if ( '' === $body ) {
+			$current_blocks = array();
+			$current_len    = 0;
+			return;
+		}
+
+		$full_text = ( '' !== $current_breadcrumb ) ? "Section: {$current_breadcrumb}\n{$body}" : $body;
+		$chunks[]  = array(
+			'anchor' => $current_anchor,
+			'text'   => $full_text,
+		);
+
+		$current_blocks = array();
+		$current_len    = 0;
+	};
+
+	foreach ( $root->childNodes as $node ) {
+		if ( XML_ELEMENT_NODE !== $node->nodeType ) {
+			continue;
+		}
+
+		$tag = strtolower( $node->nodeName );
+
+		if ( 'hr' === $tag ) {
+			continue;
+		}
+
+		if ( preg_match( '/^h([1-6])$/', $tag, $matches ) ) {
+			$flush_chunk();
+
+			$level        = (int) $matches[1];
+			$heading_text = trim( preg_replace( '/\s+/u', ' ', $node->textContent ) );
+
+			foreach ( array_keys( $heading_stack ) as $existing_level ) {
+				if ( $existing_level >= $level ) {
+					unset( $heading_stack[ $existing_level ] );
+				}
+			}
+			if ( '' !== $heading_text ) {
+				$heading_stack[ $level ] = $heading_text;
+			}
+			ksort( $heading_stack );
+
+			$breadcrumb_parts = array();
+			foreach ( $heading_stack as $lvl => $lbl ) {
+				if ( $lvl > 1 || 1 === count( $heading_stack ) ) {
+					$breadcrumb_parts[] = $lbl;
+				}
+			}
+
+			$current_breadcrumb = implode( ' > ', $breadcrumb_parts );
+			$current_anchor     = infinibase_make_anchor_id( $heading_text );
+			continue;
+		}
+
+		$block_text = infinibase_extract_node_text( $node );
+		if ( '' === $block_text ) {
+			continue;
+		}
+
+		$block_len = strlen( $block_text );
+		if ( $current_len > 0 && ( $current_len + $block_len ) > $max_chunk_chars ) {
+			$flush_chunk();
+		}
+
+		$current_blocks[] = $block_text;
+		$current_len     += $block_len + 2;
+	}
+
+	$flush_chunk();
+
+	return $chunks;
+}
+
 function infinibase_generate_keywords( $chunk_text ) {
 	$prompt = "Generate 5 to 10 highly relevant search keywords for the following documentation text. Return ONLY the keywords separated by commas. Do not include any other text, formatting, or explanation.\n\nText:\n" . $chunk_text;
 	$result = infinibase_request_ai_text( $prompt, '', 100, 15 );
@@ -95,46 +256,9 @@ function infinibase_handle_upload() {
 		return;
 	}
 
-	if ( ! class_exists( '\InfiniBase\Vendor\Parsedown' ) ) {
-		require_once INFINIBASE_PLUGIN_DIR . 'includes/class-infinibase-parsedown.php';
-	}
-
 	$file_name    = $uploaded_file_name;
 	$file_content = file_get_contents( $uploaded_tmp_name );
-
-	$parsedown    = new \InfiniBase\Vendor\Parsedown();
-	$html_content = $parsedown->text( $file_content );
-
-	$dom = new DOMDocument();
-	libxml_use_internal_errors( true );
-	@$dom->loadHTML( '<?xml encoding="utf-8" ?>' . $html_content, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
-	libxml_clear_errors();
-
-	$chunks         = array();
-	$current_anchor = sanitize_title_with_dashes( 'introduction' );
-	$current_text   = '';
-
-	foreach ( $dom->childNodes as $node ) {
-		if ( XML_ELEMENT_NODE === $node->nodeType && preg_match( '/^h[1-6]$/i', $node->nodeName ) ) {
-			if ( '' !== trim( $current_text ) ) {
-				$chunks[] = array(
-					'anchor' => $current_anchor,
-					'text'   => trim( $current_text ),
-				);
-			}
-			$current_anchor = sanitize_title_with_dashes( $node->textContent );
-			$current_text   = '';
-		} else {
-			$current_text .= $node->textContent . "\n";
-		}
-	}
-
-	if ( '' !== trim( $current_text ) ) {
-		$chunks[] = array(
-			'anchor' => $current_anchor,
-			'text'   => trim( $current_text ),
-		);
-	}
+	$chunks       = infinibase_parse_markdown_chunks( $file_content );
 
 	global $wpdb;
 	$table_name = $wpdb->prefix . 'infinibase_docs';

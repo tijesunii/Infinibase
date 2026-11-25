@@ -3,7 +3,7 @@
  * Plugin Name: InfiniBase: AI FAQ & Knowledge Base
  * Plugin URI: https://allmytools.xyz/
  * Description: AI-powered FAQ knowledge base using your own API key (BYOK) or WordPress Core AI Client to generate accurate answers from your Markdown docs without hallucinations.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: THEWPBRO
  * License: GPLv2 or later
  * Text Domain: infinibase
@@ -13,11 +13,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'INFINIBASE_VERSION', '1.0.0' );
+define( 'INFINIBASE_VERSION', '1.0.1' );
+define( 'INFINIBASE_DB_VERSION', '1.1' );
 define( 'INFINIBASE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'INFINIBASE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-function infinibase_activate() {
+function infinibase_install_or_upgrade_db() {
 	global $wpdb;
 	$table_name      = $wpdb->prefix . 'infinibase_docs';
 	$charset_collate = $wpdb->get_charset_collate();
@@ -32,11 +33,26 @@ function infinibase_activate() {
 		keywords longtext NOT NULL,
 		created_at datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
 		PRIMARY KEY  (id),
-		FULLTEXT KEY keywords (keywords)
+		KEY file_name (file_name(191)),
+		FULLTEXT KEY keywords (keywords),
+		FULLTEXT KEY search_content (keywords,chunk_text)
 	) $charset_collate;";
 
 	require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 	dbDelta( $sql );
+
+	update_option( 'infinibase_db_version', INFINIBASE_DB_VERSION );
+}
+
+function infinibase_maybe_upgrade_db() {
+	if ( get_option( 'infinibase_db_version', '' ) !== INFINIBASE_DB_VERSION ) {
+		infinibase_install_or_upgrade_db();
+	}
+}
+add_action( 'plugins_loaded', 'infinibase_maybe_upgrade_db' );
+
+function infinibase_activate() {
+	infinibase_install_or_upgrade_db();
 
 	if ( false === get_option( 'infinibase_support_url' ) ) {
 		add_option( 'infinibase_support_url', '' );
@@ -268,9 +284,12 @@ function infinibase_request_ai_text( $user_prompt, $system_prompt = '', $max_tok
 
 		// phpcs:ignore PluginCheck.CodeAnalysis.AIProvider.DirectIntegration
 		$response = wp_remote_post(
-			'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' . $api_key,
+			'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
 			array(
-				'headers' => array( 'Content-Type' => 'application/json' ),
+				'headers' => array(
+					'Content-Type'   => 'application/json',
+					'x-goog-api-key' => $api_key,
+				),
 				'body'    => wp_json_encode( $payload ),
 				'timeout' => $timeout,
 			)

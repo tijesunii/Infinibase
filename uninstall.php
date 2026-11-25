@@ -23,5 +23,6 @@ if ( ! $infinibase_keep_data || '0' === $infinibase_keep_data ) {
 	delete_option( 'infinibase_shortcode_heading' );
 	delete_option( 'infinibase_shortcode_subtitle' );
 	delete_option( 'infinibase_static_faqs' );
+	delete_option( 'infinibase_db_version' );
 	delete_option( 'infinibase_keep_data_on_uninstall' );
 }
