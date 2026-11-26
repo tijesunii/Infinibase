@@ -18,6 +18,8 @@ Turn your product documentation into an interactive FAQ section with built-in AI
 
 It renders as a fast, native FAQ section right inside your page layout, blending naturally into your website without floating chatbot popups getting in the way.
 
+https://www.youtube.com/watch?v=OQTo6zAGByQ
+
 = How It Works =
 
 1. **Connect Your Preferred AI:** Use WordPress's built-in **Settings → Connectors** or paste your own API key from OpenAI, Anthropic Claude, Google Gemini, or DeepSeek.
